@@ -43,11 +43,11 @@ fn main() -> Result<(), Box<dyn Error>> {
   let mut magic: [u8; 4] = [0; 4];
   reader.read_exact(&mut magic)?;
 
-  println!("Magic: {:#02X?}", &magic);
+  println!("Magic: {:#04X?}", &magic);
 
   if magic != UNCONTAINED_PARAM_SFO_MAGIC {
     println!(
-      "Magic {:#02X?} doesn't match any known .sfo file magic",
+      "Magic {:#04X?} doesn't match any known .sfo file magic",
       &magic
     );
     return Err(Box::new(MainErr::UnknownMagic));

@@ -49,7 +49,7 @@ impl Display for Header {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
-      "Version: {:#02X}\nKey table start offset: {:#02X}\nData table start offset: {:#02X}\nTable entries count: {} [{:#02X}]",
+      "Version: {:#010X}\nKey table start offset: {:#010X}\nData table start offset: {:#010X}\nTable entries count: {} [{:#010X}]",
       self.version,
       self.key_table_start,
       self.data_table_start,
