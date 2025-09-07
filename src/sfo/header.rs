@@ -1,6 +1,5 @@
 use std::{
   fmt::Display,
-  fs::File,
   io::{BufReader, Read},
 };
 
@@ -12,7 +11,10 @@ pub struct Header {
 }
 
 impl Header {
-  pub fn new(reader: &mut BufReader<File>) -> Result<Self, String> {
+  pub fn new<T>(reader: &mut BufReader<T>) -> Result<Self, String>
+  where
+    T: Read,
+  {
     let mut buffer: [u8; 4] = [0; 4];
     reader
       .read_exact(&mut buffer)
