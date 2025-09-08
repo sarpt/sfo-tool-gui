@@ -1,17 +1,15 @@
-use std::{
-  fmt::Display,
-  io::{BufReader, Read},
-};
+use std::{fmt::Display, io::Read};
 
+#[derive(Clone, Copy, Debug)]
 pub struct Header {
-  version: u32,
-  key_table_start: u32,
-  data_table_start: u32,
-  table_entries: u32,
+  pub version: u32,
+  pub key_table_start: u32,
+  pub data_table_start: u32,
+  pub table_entries: u32,
 }
 
 impl Header {
-  pub fn new<T>(reader: &mut BufReader<T>) -> Result<Self, String>
+  pub fn new<T>(reader: &mut T) -> Result<Self, String>
   where
     T: Read,
   {

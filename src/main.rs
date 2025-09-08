@@ -8,7 +8,7 @@ use std::{
 use clap::Parser;
 use thiserror::Error;
 
-use crate::sfo::header::Header;
+use crate::sfo::{header::Header, index_table::IndexTable};
 
 mod sfo;
 
@@ -55,6 +55,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   let header = Header::new(&mut reader)?;
   println!("{header}");
+
+  let index_table = IndexTable::new(&mut reader, &header)?;
+  println!("{index_table}");
 
   Ok(())
 }
