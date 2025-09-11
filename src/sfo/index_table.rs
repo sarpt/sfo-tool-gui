@@ -13,8 +13,22 @@ impl IndexTable {
   {
     let mut entries: Vec<IndexTableEntry> = Vec::new();
 
-    for _ in 0..header.table_entries {
-      entries.push(IndexTableEntry::new(reader)?);
+    for idx in 0..header.table_entries {
+      let mut entry = IndexTableEntry::new(reader)?;
+
+      if idx != 0 {
+        let prev_entry = entries
+          .get_mut((idx - 1) as usize)
+          .ok_or_else(|| format!("could not update length of key {}", idx - 1))?;
+        prev_entry.key_len = entry.key_offset as u32 - prev_entry.key_offset as u32;
+      }
+
+      if idx == header.table_entries - 1 {
+        entry.key_len =
+          header.data_table_start - (entry.key_offset as u32 + header.key_table_start);
+      }
+
+      entries.push(entry);
     }
 
     Ok(IndexTable { entries })
@@ -37,6 +51,7 @@ impl Display for IndexTable {
 #[derive(Clone, Copy, Debug)]
 pub struct IndexTableEntry {
   pub key_offset: u16,
+  pub key_len: u32,
   pub data_format: Format,
   pub data_len: u32,
   pub data_max_len: u32,
@@ -87,6 +102,7 @@ impl IndexTableEntry {
 
     Ok(IndexTableEntry {
       key_offset,
+      key_len: 0,
       data_format,
       data_len,
       data_max_len,

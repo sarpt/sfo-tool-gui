@@ -8,7 +8,7 @@ use std::{
 use clap::Parser;
 use thiserror::Error;
 
-use crate::sfo::{header::Header, index_table::IndexTable};
+use crate::sfo::{header::Header, index_table::IndexTable, mapping::Mapping};
 
 mod sfo;
 
@@ -58,6 +58,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
   let index_table = IndexTable::new(&mut reader, &header)?;
   println!("{index_table}");
+
+  let entries_mapping = Mapping::new(&mut reader, &index_table)?;
+  println!("{entries_mapping}");
 
   Ok(())
 }
