@@ -38,7 +38,7 @@ impl Mapping {
     let mut entries = HashMap::<Keys, DataField>::new();
 
     for (idx, index_table_entry) in index_table.entries.iter().enumerate() {
-      let key = keys[idx];
+      let key = keys[idx].clone();
       let mut data_buff = vec![0; index_table_entry.data_max_len as usize];
       reader
         .read_exact(&mut data_buff)
@@ -88,8 +88,7 @@ pub fn key_from_buff(buff: &[u8]) -> Result<Keys, String> {
 
   let key_str = str::from_utf8(&buff[0..nul_range_end - 1])
     .map_err(|err| format!("key is not a valid UTF8 string: {err}"))?;
-  let key = Keys::from_str(key_str)
-    .map_err(|err| format!("unknown key {key_str} with provided: {err}",))?;
+  let key = Keys::from_str(key_str).unwrap_or_else(|_| Keys::Unknown(key_str.to_owned()));
 
   Ok(key)
 }
