@@ -1,4 +1,4 @@
-#[derive(strum::EnumString, PartialEq, Eq, strum::Display, strum::AsRefStr, Clone, Copy, Hash)]
+#[derive(strum::EnumString, PartialEq, Eq, strum::Display, strum::AsRefStr, Clone, Hash)]
 pub enum Keys {
   #[strum(serialize = "ACCOUNT_ID")]
   AccountId,
@@ -82,4 +82,6 @@ pub enum Keys {
   Version,
   #[strum(serialize = "XMB_APPS")]
   XmbApps,
+  #[strum(serialize = "{0}")]
+  Unknown(String),
 }

@@ -41,8 +41,6 @@ impl Sfo {
       .read_exact(&mut magic)
       .map_err(|err| SfoParseErr::MagicReadErr(err.to_string()))?;
 
-    println!("Magic: {:#04X?}", &magic);
-
     if magic != UNCONTAINED_PARAM_SFO_MAGIC {
       return Err(SfoParseErr::UnknownMagic(format!(
         "Magic {:#04X?} doesn't match any known .sfo file magic",
