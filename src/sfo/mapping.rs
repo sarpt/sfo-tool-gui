@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display, io::Read, str::FromStr, vec};
 use crate::sfo::{format::Format, index_table::IndexTable, keys::Keys};
 
 pub struct Mapping {
-  entries: HashMap<Keys, DataField>,
+  pub entries: HashMap<Keys, DataField>,
 }
 
 impl Display for Mapping {

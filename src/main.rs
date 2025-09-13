@@ -1,3 +1,4 @@
+use eframe::egui;
 use std::{
   error::Error,
   fs::OpenOptions,
@@ -15,7 +16,7 @@ mod sfo;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Parser, Debug)]
-#[command(version = VERSION, about = "analysis of PS3/PS4 .sfo files", long_about = None)]
+#[command(version = VERSION, about = "analysis of PS3 .sfo files", long_about = None)]
 struct Args {
   #[arg(long, required = true, help = "Path to a .sfo file")]
   input_file: PathBuf,
@@ -62,5 +63,45 @@ fn main() -> Result<(), Box<dyn Error>> {
   let entries_mapping = Mapping::new(&mut reader, &index_table)?;
   println!("{entries_mapping}");
 
+  let native_options = eframe::NativeOptions::default();
+  eframe::run_native(
+    "Read .sfo",
+    native_options,
+    Box::new(|cc| Ok(Box::new(GuiApp::new(cc, entries_mapping)))),
+  )
+  .map_err(|err| format!("could not start eframe application: {err}"))?;
+
   Ok(())
+}
+
+struct GuiApp {
+  mapping: Mapping,
+}
+
+impl GuiApp {
+  fn new(_cc: &eframe::CreationContext<'_>, mapping: Mapping) -> Self {
+    GuiApp { mapping }
+  }
+
+  fn mapping_entries_grid(&self, ui: &mut eframe::egui::Ui) {
+    for (key, value) in &self.mapping.entries {
+      ui.label(key.to_string());
+      ui.label(value.to_string());
+      ui.end_row();
+    }
+  }
+}
+
+impl eframe::App for GuiApp {
+  fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    egui::CentralPanel::default().show(ctx, |ui| {
+      egui::Grid::new("mapping_grid")
+        .num_columns(2)
+        .spacing([40.0, 4.0])
+        .striped(true)
+        .show(ui, |ui| {
+          self.mapping_entries_grid(ui);
+        });
+    });
+  }
 }
