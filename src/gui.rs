@@ -11,7 +11,7 @@ impl GuiApp {
   }
 
   fn mapping_entries_grid(&self, ui: &mut eframe::egui::Ui) {
-    for (key, value) in &self.sfo.entries_mapping.entries {
+    for (key, value) in self.sfo.entries_mapping.iter() {
       ui.label(key.to_string());
       ui.label(value.to_string());
       ui.end_row();

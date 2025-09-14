@@ -3,7 +3,8 @@ use std::{collections::HashMap, fmt::Display, io::Read, str::FromStr, vec};
 use crate::sfo::{format::Format, index_table::IndexTable, keys::Keys};
 
 pub struct Mapping {
-  pub entries: HashMap<Keys, DataField>,
+  keys_order: Vec<Keys>,
+  entries: HashMap<Keys, DataField>,
 }
 
 impl Display for Mapping {
@@ -24,7 +25,7 @@ impl Mapping {
   where
     T: Read,
   {
-    let mut keys = Vec::<Keys>::with_capacity(index_table.entries.len());
+    let mut keys_order = Vec::<Keys>::with_capacity(index_table.entries.len());
 
     for index_table_entry in &index_table.entries {
       let mut buff = vec![0; index_table_entry.key_len as usize];
@@ -32,13 +33,13 @@ impl Mapping {
         .read_exact(&mut buff)
         .map_err(|err| format!("could not read key: {err}"))?;
 
-      keys.push(key_from_buff(&buff)?);
+      keys_order.push(key_from_buff(&buff)?);
     }
 
     let mut entries = HashMap::<Keys, DataField>::new();
 
     for (idx, index_table_entry) in index_table.entries.iter().enumerate() {
-      let key = keys[idx].clone();
+      let key = keys_order[idx].clone();
       let mut data_buff = vec![0; index_table_entry.data_max_len as usize];
       reader
         .read_exact(&mut data_buff)
@@ -59,7 +60,14 @@ impl Mapping {
       entries.insert(key, data);
     }
 
-    Ok(Mapping { entries })
+    Ok(Mapping {
+      entries,
+      keys_order,
+    })
+  }
+
+  pub fn iter<'a>(&'a self) -> MappingIter<'a> {
+    MappingIter::new(self)
   }
 }
 
@@ -91,4 +99,28 @@ pub fn key_from_buff(buff: &[u8]) -> Result<Keys, String> {
   let key = Keys::from_str(key_str).unwrap_or_else(|_| Keys::Unknown(key_str.to_owned()));
 
   Ok(key)
+}
+
+pub struct MappingIter<'a> {
+  idx: usize,
+  mapping: &'a Mapping,
+}
+
+impl<'a> MappingIter<'a> {
+  fn new(mapping: &'a Mapping) -> Self {
+    Self { idx: 0, mapping }
+  }
+}
+
+impl<'a> Iterator for MappingIter<'a> {
+  type Item = (&'a Keys, &'a DataField);
+
+  fn next(&mut self) -> Option<Self::Item> {
+    let idx = self.idx;
+    self.idx += 1;
+
+    let elem_key = self.mapping.keys_order.get(idx)?;
+    let elem = self.mapping.entries.get(elem_key)?;
+    Some((elem_key, elem))
+  }
 }
