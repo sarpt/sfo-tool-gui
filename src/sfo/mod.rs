@@ -1,7 +1,12 @@
-use std::io::Read;
+use std::{io::Read, iter::Enumerate};
 use thiserror::Error;
 
-use crate::sfo::{header::Header, index_table::IndexTable, mapping::Mapping};
+use crate::sfo::{
+  header::Header,
+  index_table::{IndexTable, IndexTableEntry},
+  keys::Keys,
+  mapping::{DataField, Mapping, MappingIter},
+};
 
 pub mod format;
 pub mod header;
@@ -58,5 +63,45 @@ impl Sfo {
       index_table,
       entries_mapping,
     })
+  }
+
+  pub fn iter<'a>(&'a self) -> SfoEntryIter<'a> {
+    let mapping_enumerate = self.entries_mapping.iter().enumerate();
+
+    SfoEntryIter::new(&self.index_table, mapping_enumerate)
+  }
+}
+
+pub struct SfoEntry<'a> {
+  pub data: &'a DataField,
+  pub index_table_entry: &'a IndexTableEntry,
+}
+
+pub struct SfoEntryIter<'a> {
+  index_table: &'a IndexTable,
+  mapping_enumerate: Enumerate<MappingIter<'a>>,
+}
+
+impl<'a> SfoEntryIter<'a> {
+  fn new(index_table: &'a IndexTable, mapping_enumerate: Enumerate<MappingIter<'a>>) -> Self {
+    Self {
+      index_table,
+      mapping_enumerate,
+    }
+  }
+}
+
+impl<'a> Iterator for SfoEntryIter<'a> {
+  type Item = (&'a Keys, SfoEntry<'a>);
+
+  fn next(&mut self) -> Option<Self::Item> {
+    let (idx, (key, data)) = self.mapping_enumerate.next()?;
+
+    let index_table_entry = self.index_table.entries.get(idx)?;
+    let entry = SfoEntry {
+      data,
+      index_table_entry,
+    };
+    Some((key, entry))
   }
 }
