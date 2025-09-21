@@ -25,6 +25,32 @@ impl GuiApp {
     GuiApp { sfo }
   }
 
+  fn show_loaded_file_mapping(&self, ctx: &egui::Context, sfo: &Sfo) {
+    egui::CentralPanel::default().show(ctx, |ui| {
+      egui::ScrollArea::both().show(ui, |ui| {
+        self.mapping_entries_grid(ui, sfo);
+      });
+    });
+  }
+
+  fn show_no_file_loaded_info(&mut self, ctx: &egui::Context) {
+    egui::CentralPanel::default().show(ctx, |ui| {
+      ui.with_layout(
+        egui::Layout::top_down_justified(egui::Align::Center).with_main_justify(true),
+        |ui| {
+          let upload_button =
+            ui.link("No .sfo file has been provided.\nClick here to provide .sfo file");
+
+          if upload_button.clicked() {
+            self.show_load_sfo_picker(ctx);
+          }
+        },
+      );
+    });
+  }
+
+  fn show_file_loading_error(&mut self, ui: &mut eframe::egui::Ui) {}
+
   fn mapping_entries_grid(&self, ui: &mut eframe::egui::Ui, sfo: &Sfo) {
     egui::Grid::new("mapping_grid")
       .num_columns(2)
@@ -49,39 +75,39 @@ impl GuiApp {
         }
       });
   }
+
+  fn show_load_sfo_picker(&mut self, ctx: &egui::Context) {
+    let files = FileDialog::new()
+      .add_filter("Sfo", &["sfo", "SFO"])
+      .set_directory("/")
+      .pick_file();
+
+    let data_path = match files {
+      Some(path) => path,
+      None => {
+        println!("no path provided");
+        return;
+      }
+    };
+    self.sfo = load_sfo_file(&data_path).map_or_else(
+      |err| {
+        println!("could not load a sfo file: {err}");
+        None
+      },
+      Some,
+    );
+    ctx.request_repaint();
+  }
 }
 
 impl eframe::App for GuiApp {
   fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
     match &self.sfo {
       Some(sfo) => {
-        egui::CentralPanel::default().show(ctx, |ui| {
-          egui::ScrollArea::both().show(ui, |ui| {
-            self.mapping_entries_grid(ui, sfo);
-          });
-        });
+        self.show_loaded_file_mapping(ctx, sfo);
       }
       None => {
-        let files = FileDialog::new()
-          .add_filter("Sfo", &["sfo", "SFO"])
-          .set_directory("/")
-          .pick_file();
-
-        let data_path = match files {
-          Some(path) => path,
-          None => {
-            println!("no path provided");
-            return;
-          }
-        };
-        self.sfo = load_sfo_file(&data_path).map_or_else(
-          |err| {
-            println!("could not load a sfo file: {err}");
-            None
-          },
-          Some,
-        );
-        ctx.request_repaint();
+        self.show_no_file_loaded_info(ctx);
       }
     }
   }
