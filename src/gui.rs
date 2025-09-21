@@ -1,4 +1,5 @@
 use std::{
+  borrow::Cow,
   fs::OpenOptions,
   io::BufReader,
   path::{Path, PathBuf},
@@ -16,6 +17,8 @@ struct LoadedSfo {
 pub struct GuiApp {
   sfo: Option<LoadedSfo>,
 }
+
+const NO_SFO_FILE_MSG: &str = "No .sfo file has been provided";
 
 impl GuiApp {
   pub fn new<T>(_cc: &eframe::CreationContext<'_>, path: Option<&T>) -> Self
@@ -40,14 +43,24 @@ impl GuiApp {
     GuiApp { sfo }
   }
 
-  fn show_loaded_file(&self, ctx: &egui::Context, loaded_sfo: &LoadedSfo) {
+  fn show_header(&mut self, ctx: &egui::Context) {
     egui::TopBottomPanel::top("header_panel").show(ctx, |ui| {
+      let upload_button = ui.button("Load .sfo file");
+      if upload_button.clicked() {
+        self.show_load_sfo_picker(ctx);
+      }
+
       ui.label(format!(
         "Loaded file: {}",
-        loaded_sfo.path.to_string_lossy()
-      ))
+        self
+          .sfo
+          .as_ref()
+          .map_or(Cow::from(NO_SFO_FILE_MSG), |sfo| sfo.path.to_string_lossy())
+      ));
     });
+  }
 
+  fn show_loaded_file(&self, ctx: &egui::Context, loaded_sfo: &LoadedSfo) {
     egui::CentralPanel::default().show(ctx, |ui| {
       egui::ScrollArea::both().show(ui, |ui| {
         self.mapping_entries_grid(ui, &loaded_sfo.sfo);
@@ -60,10 +73,10 @@ impl GuiApp {
       ui.with_layout(
         egui::Layout::top_down_justified(egui::Align::Center).with_main_justify(true),
         |ui| {
-          let upload_button =
-            ui.link("No .sfo file has been provided.\nClick here to provide a .sfo file");
-
-          if upload_button.clicked() {
+          let upload_link = ui.link(format!(
+            "{NO_SFO_FILE_MSG}\nClick here to provide a .sfo file"
+          ));
+          if upload_link.clicked() {
             self.show_load_sfo_picker(ctx);
           }
         },
@@ -129,6 +142,10 @@ impl GuiApp {
 
 impl eframe::App for GuiApp {
   fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    if self.sfo.is_some() {
+      self.show_header(ctx);
+    }
+
     match &self.sfo {
       Some(sfo) => {
         self.show_loaded_file(ctx, sfo);
