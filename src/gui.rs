@@ -1,17 +1,26 @@
-use std::{fs::OpenOptions, io::BufReader, path::Path};
+use std::{
+  fs::OpenOptions,
+  io::BufReader,
+  path::{Path, PathBuf},
+};
 
 use crate::sfo::Sfo;
 use eframe::egui::{self};
 use rfd::FileDialog;
 
+struct LoadedSfo {
+  sfo: Sfo,
+  path: PathBuf,
+}
+
 pub struct GuiApp {
-  sfo: Option<Sfo>,
+  sfo: Option<LoadedSfo>,
 }
 
 impl GuiApp {
   pub fn new<T>(_cc: &eframe::CreationContext<'_>, path: Option<&T>) -> Self
   where
-    T: AsRef<Path>,
+    T: AsRef<Path> + Into<PathBuf>,
   {
     let sfo = path.and_then(|path| {
       load_sfo_file(path.as_ref()).map_or_else(
@@ -19,16 +28,29 @@ impl GuiApp {
           println!("could not load sfo file provided in arguments: {err}");
           None
         },
-        Some,
+        |sfo| {
+          Some(LoadedSfo {
+            sfo,
+            path: PathBuf::from(path.as_ref()),
+          })
+        },
       )
     });
+
     GuiApp { sfo }
   }
 
-  fn show_loaded_file_mapping(&self, ctx: &egui::Context, sfo: &Sfo) {
+  fn show_loaded_file(&self, ctx: &egui::Context, loaded_sfo: &LoadedSfo) {
+    egui::TopBottomPanel::top("header_panel").show(ctx, |ui| {
+      ui.label(format!(
+        "Loaded file: {}",
+        loaded_sfo.path.to_string_lossy()
+      ))
+    });
+
     egui::CentralPanel::default().show(ctx, |ui| {
       egui::ScrollArea::both().show(ui, |ui| {
-        self.mapping_entries_grid(ui, sfo);
+        self.mapping_entries_grid(ui, &loaded_sfo.sfo);
       });
     });
   }
@@ -39,7 +61,7 @@ impl GuiApp {
         egui::Layout::top_down_justified(egui::Align::Center).with_main_justify(true),
         |ui| {
           let upload_button =
-            ui.link("No .sfo file has been provided.\nClick here to provide .sfo file");
+            ui.link("No .sfo file has been provided.\nClick here to provide a .sfo file");
 
           if upload_button.clicked() {
             self.show_load_sfo_picker(ctx);
@@ -94,7 +116,12 @@ impl GuiApp {
         println!("could not load a sfo file: {err}");
         None
       },
-      Some,
+      |sfo| {
+        Some(LoadedSfo {
+          sfo,
+          path: PathBuf::from(&data_path),
+        })
+      },
     );
     ctx.request_repaint();
   }
@@ -104,7 +131,7 @@ impl eframe::App for GuiApp {
   fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
     match &self.sfo {
       Some(sfo) => {
-        self.show_loaded_file_mapping(ctx, sfo);
+        self.show_loaded_file(ctx, sfo);
       }
       None => {
         self.show_no_file_loaded_info(ctx);
