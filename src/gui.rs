@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::sfo::Sfo;
-use eframe::egui::{self};
+use eframe::egui::{self, Id};
 use rfd::FileDialog;
 
 struct LoadedSfo {
@@ -15,6 +15,7 @@ struct LoadedSfo {
 }
 
 pub struct GuiApp {
+  err_msg: Option<String>,
   sfo: Option<LoadedSfo>,
 }
 
@@ -25,10 +26,14 @@ impl GuiApp {
   where
     T: AsRef<Path> + Into<PathBuf>,
   {
+    let mut err_msg: Option<String> = None;
     let sfo = path.and_then(|path| {
       load_sfo_file(path.as_ref()).map_or_else(
         |err| {
-          println!("could not load sfo file provided in arguments: {err}");
+          err_msg = Some(format!(
+            "could not load sfo file with path {} provided in \"input-file\" argument: {err}",
+            path.as_ref().to_string_lossy()
+          ));
           None
         },
         |sfo| {
@@ -40,7 +45,7 @@ impl GuiApp {
       )
     });
 
-    GuiApp { sfo }
+    GuiApp { sfo, err_msg }
   }
 
   fn show_header(&mut self, ctx: &egui::Context) {
@@ -84,7 +89,18 @@ impl GuiApp {
     });
   }
 
-  fn show_file_loading_error(&mut self, ui: &mut eframe::egui::Ui) {}
+  fn handle_loading_error_modal(&mut self, ctx: &eframe::egui::Context) {
+    if let Some(err_msg) = &self.err_msg {
+      let modal = egui::Modal::new(Id::new("file_loading_error_modal")).show(ctx, |ui| {
+        ui.set_width(250.0);
+        ui.label(err_msg);
+      });
+
+      if modal.should_close() {
+        self.err_msg = None;
+      }
+    }
+  }
 
   fn mapping_entries_grid(&self, ui: &mut eframe::egui::Ui, sfo: &Sfo) {
     egui::Grid::new("mapping_grid")
@@ -124,9 +140,9 @@ impl GuiApp {
         return;
       }
     };
-    self.sfo = load_sfo_file(&data_path).map_or_else(
+    let new_sfo = load_sfo_file(&data_path).map_or_else(
       |err| {
-        println!("could not load a sfo file: {err}");
+        self.err_msg = Some(format!("could not load a sfo file: {err}"));
         None
       },
       |sfo| {
@@ -136,12 +152,21 @@ impl GuiApp {
         })
       },
     );
+
+    if new_sfo.is_some() {
+      self.sfo = new_sfo;
+    }
+
     ctx.request_repaint();
   }
 }
 
 impl eframe::App for GuiApp {
   fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    if self.err_msg.is_some() {
+      self.handle_loading_error_modal(ctx);
+    }
+
     if self.sfo.is_some() {
       self.show_header(ctx);
     }
