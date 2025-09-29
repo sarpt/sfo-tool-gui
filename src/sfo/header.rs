@@ -46,7 +46,7 @@ impl Header {
 
   pub fn add_entry(&mut self, key: &Keys) {
     self.key_table_start += 16;
-    self.data_table_start += key.len() as u32;
+    self.data_table_start += key.len() as u32; // TODO: take into account padding aligned to 4 bytes between key table and start of table_entries
     self.table_entries += 1;
   }
 }

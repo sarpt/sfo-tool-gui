@@ -128,21 +128,39 @@ impl GuiApp {
       let mut data_field_value = draft_entry.field.to_string();
       let modal = egui::Modal::new(Id::new("draft_entry_modal")).show(ctx, |ui| {
         ui.set_width(250.0);
-        ui.text_edit_singleline(&mut key_value);
-        ui.text_edit_singleline(&mut data_field_value);
+        egui::Grid::new("draft_entry_grid")
+          .num_columns(2)
+          .min_col_width(10.0)
+          .max_col_width(ui.available_size().x)
+          .spacing([20.0, 4.0])
+          .striped(true)
+          .show(ui, |ui| {
+            ui.label("Key");
+            ui.text_edit_singleline(&mut key_value);
+            ui.end_row();
+
+            ui.label("Data");
+            ui.text_edit_singleline(&mut data_field_value);
+            ui.end_row();
+          });
       });
 
       draft_entry.key =
         Keys::from_str(&key_value).expect("could not serialize string for draft entry key");
       draft_entry.field = DataField::Utf8String(data_field_value);
 
-      if modal.should_close() {
-        if let Some(sfo) = &mut self.sfo {
-          sfo.sfo.add(draft_entry.key, draft_entry.field);
-        }
-        self.draft_entry = None;
-      } else {
+      if !modal.should_close() {
         self.draft_entry = Some(draft_entry);
+        return;
+      }
+
+      if draft_entry.key.len() == 0 || draft_entry.field.to_string().is_empty() {
+        self.err_msg = Some(String::from("Cannot add an entry with empty key or field"));
+        return;
+      }
+
+      if let Some(sfo) = &mut self.sfo {
+        sfo.sfo.add(draft_entry.key, draft_entry.field);
       }
     }
   }
