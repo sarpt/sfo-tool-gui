@@ -85,3 +85,9 @@ pub enum Keys {
   #[strum(serialize = "{0}", default)]
   Unknown(String),
 }
+
+impl Keys {
+  pub fn len(&self) -> usize {
+    self.as_ref().len() + 1
+  }
+}

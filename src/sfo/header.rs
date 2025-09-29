@@ -1,5 +1,7 @@
 use std::{fmt::Display, io::Read};
 
+use crate::sfo::keys::Keys;
+
 #[derive(Clone, Copy, Debug)]
 pub struct Header {
   pub version: u32,
@@ -40,6 +42,12 @@ impl Header {
       data_table_start,
       table_entries,
     })
+  }
+
+  pub fn add_entry(&mut self, key: &Keys) {
+    self.key_table_start += 16;
+    self.data_table_start += key.len() as u32;
+    self.table_entries += 1;
   }
 }
 
