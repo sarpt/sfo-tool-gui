@@ -3,9 +3,10 @@ use std::{
   fs::OpenOptions,
   io::BufReader,
   path::{Path, PathBuf},
+  str::FromStr,
 };
 
-use crate::sfo::Sfo;
+use crate::sfo::{Sfo, keys::Keys, mapping::DataField};
 use eframe::egui::{self, Id};
 use rfd::FileDialog;
 
@@ -14,9 +15,24 @@ struct LoadedSfo {
   path: PathBuf,
 }
 
+struct DraftEntry {
+  key: Keys,
+  field: DataField,
+}
+
+impl Default for DraftEntry {
+  fn default() -> Self {
+    Self {
+      key: Keys::Unknown(String::new()),
+      field: DataField::Utf8String(String::new()),
+    }
+  }
+}
+
 pub struct GuiApp {
   err_msg: Option<String>,
   sfo: Option<LoadedSfo>,
+  draft_entry: Option<DraftEntry>,
 }
 
 const NO_SFO_FILE_MSG: &str = "No .sfo file has been provided";
@@ -45,7 +61,11 @@ impl GuiApp {
       )
     });
 
-    GuiApp { sfo, err_msg }
+    GuiApp {
+      sfo,
+      err_msg,
+      draft_entry: None,
+    }
   }
 
   fn show_header(&mut self, ctx: &egui::Context) {
@@ -65,7 +85,7 @@ impl GuiApp {
     });
   }
 
-  fn show_loaded_file(&self, ctx: &egui::Context, loaded_sfo: &LoadedSfo) {
+  fn show_loaded_file(&mut self, ctx: &egui::Context, loaded_sfo: &LoadedSfo) {
     egui::CentralPanel::default().show(ctx, |ui| {
       egui::ScrollArea::both().show(ui, |ui| {
         self.mapping_entries_grid(ui, &loaded_sfo.sfo);
@@ -89,9 +109,9 @@ impl GuiApp {
     });
   }
 
-  fn handle_loading_error_modal(&mut self, ctx: &eframe::egui::Context) {
+  fn handle_err_msg_modal(&mut self, ctx: &eframe::egui::Context) {
     if let Some(err_msg) = &self.err_msg {
-      let modal = egui::Modal::new(Id::new("file_loading_error_modal")).show(ctx, |ui| {
+      let modal = egui::Modal::new(Id::new("err_msg_modal")).show(ctx, |ui| {
         ui.set_width(250.0);
         ui.label(err_msg);
       });
@@ -102,23 +122,55 @@ impl GuiApp {
     }
   }
 
-  fn mapping_entries_grid(&self, ui: &mut eframe::egui::Ui, sfo: &Sfo) {
+  fn handle_draft_entry_modal(&mut self, ctx: &eframe::egui::Context) {
+    if let Some(mut draft_entry) = self.draft_entry.take() {
+      let mut key_value = draft_entry.key.to_string();
+      let mut data_field_value = draft_entry.field.to_string();
+      let modal = egui::Modal::new(Id::new("draft_entry_modal")).show(ctx, |ui| {
+        ui.set_width(250.0);
+        ui.text_edit_singleline(&mut key_value);
+        ui.text_edit_singleline(&mut data_field_value);
+      });
+
+      draft_entry.key =
+        Keys::from_str(&key_value).expect("could not serialize string for draft entry key");
+      draft_entry.field = DataField::Utf8String(data_field_value);
+
+      if modal.should_close() {
+        if let Some(sfo) = &mut self.sfo {
+          sfo.sfo.add(draft_entry.key, draft_entry.field);
+        }
+        self.draft_entry = None;
+      } else {
+        self.draft_entry = Some(draft_entry);
+      }
+    }
+  }
+
+  fn mapping_entries_grid(&mut self, ui: &mut eframe::egui::Ui, sfo: &Sfo) {
     egui::Grid::new("mapping_grid")
-      .num_columns(2)
-      .min_col_width(120.0)
+      .num_columns(3)
+      .min_col_width(10.0)
       .max_col_width(ui.available_size().x)
-      .spacing([40.0, 4.0])
+      .spacing([20.0, 4.0])
       .striped(true)
       .show(ui, |ui| {
+        let add_btn = ui.button("Add");
+        if add_btn.clicked() {
+          self.draft_entry = Some(DraftEntry::default());
+        }
+
         ui.label("KEY");
         ui.label("DATA");
         ui.end_row();
 
         ui.label("");
+        ui.label("");
         ui.add_sized(ui.available_size(), egui::Label::new(""));
         ui.end_row();
 
         for (key, entry) in sfo.iter() {
+          ui.label("");
           ui.label(key.to_string())
             .on_hover_text(entry.index_table_entry.to_string());
           ui.label(entry.data.to_string());
@@ -164,16 +216,22 @@ impl GuiApp {
 impl eframe::App for GuiApp {
   fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
     if self.err_msg.is_some() {
-      self.handle_loading_error_modal(ctx);
+      self.handle_err_msg_modal(ctx);
+    }
+
+    if self.draft_entry.is_some() {
+      self.handle_draft_entry_modal(ctx);
     }
 
     if self.sfo.is_some() {
       self.show_header(ctx);
     }
 
-    match &self.sfo {
+    let sfo = self.sfo.take();
+    match sfo {
       Some(sfo) => {
-        self.show_loaded_file(ctx, sfo);
+        self.show_loaded_file(ctx, &sfo);
+        self.sfo = Some(sfo);
       }
       None => {
         self.show_no_file_loaded_info(ctx);

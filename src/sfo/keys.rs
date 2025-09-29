@@ -82,6 +82,6 @@ pub enum Keys {
   Version,
   #[strum(serialize = "XMB_APPS")]
   XmbApps,
-  #[strum(serialize = "{0}")]
+  #[strum(serialize = "{0}", default)]
   Unknown(String),
 }

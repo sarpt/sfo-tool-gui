@@ -65,6 +65,19 @@ impl Sfo {
     })
   }
 
+  pub fn add(&mut self, key: Keys, data_field: DataField) {
+    let new_table_entry = IndexTableEntry {
+      key_len: key.to_string().len() as u32,
+      key_offset: 0,
+      data_format: format::Format::Utf8,
+      data_len: data_field.to_string().len() as u32,
+      data_max_len: data_field.to_string().len() as u32,
+      data_offset: 0,
+    };
+    self.index_table.entries.push(new_table_entry);
+    self.entries_mapping.add(key, data_field);
+  }
+
   pub fn iter<'a>(&'a self) -> SfoEntryIter<'a> {
     let mapping_enumerate = self.entries_mapping.iter().enumerate();
 

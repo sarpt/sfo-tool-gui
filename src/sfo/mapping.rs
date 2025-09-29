@@ -66,6 +66,11 @@ impl Mapping {
     })
   }
 
+  pub fn add(&mut self, key: Keys, data_field: DataField) {
+    self.keys_order.push(key.clone());
+    self.entries.insert(key, data_field);
+  }
+
   pub fn iter<'a>(&'a self) -> MappingIter<'a> {
     MappingIter::new(self)
   }
