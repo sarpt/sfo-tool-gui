@@ -54,9 +54,10 @@ impl Sfo {
     }
 
     let header = Header::new(reader).map_err(SfoParseErr::HeaderReadErr)?;
-    let index_table = IndexTable::new(reader, &header).map_err(SfoParseErr::IndexTableReadErr)?;
+    let mut index_table =
+      IndexTable::new(reader, &header).map_err(SfoParseErr::IndexTableReadErr)?;
     let entries_mapping =
-      Mapping::new(reader, &index_table).map_err(SfoParseErr::EntriesMappingReadErr)?;
+      Mapping::new(reader, &mut index_table).map_err(SfoParseErr::EntriesMappingReadErr)?;
 
     Ok(Self {
       header,
@@ -66,20 +67,37 @@ impl Sfo {
   }
 
   pub fn add(&mut self, key: Keys, data_field: DataField) {
-    self.header.add_entry(&key);
+    let previous_entry = self.iter().last();
+    let (prev_key_len, prev_padding) =
+      previous_entry.as_ref().map_or((0, 0), |(prev_key, entry)| {
+        let absolute_prev_key_start_offset =
+          self.header.key_table_start + entry.index_table_entry.key_offset as u32;
+        let absolute_prev_key_end_offset = absolute_prev_key_start_offset + prev_key.len() as u32;
+        (
+          prev_key.len() as u32,
+          self.header.data_table_start - absolute_prev_key_end_offset,
+        )
+      });
+    let key_len_with_padding = key.len() as u32 + 4 - (key.len() as u32 % 4);
 
-    let previous_entry = self.index_table.entries.last();
     let new_table_entry = IndexTableEntry {
-      key_len: key.len() as u32,
+      key_len: key_len_with_padding,
       key_offset: previous_entry
-        .map_or(0, |prev| prev.key_offset as u32 + prev.key_len)
+        .as_ref()
+        .map_or(0, |(_, prev)| {
+          prev.index_table_entry.key_offset as u32 + prev_key_len // TODO: Fix off-by-one with more than one added key
+        })
         .try_into()
         .unwrap_or_default(),
       data_format: format::Format::Utf8,
       data_len: data_field.to_string().len() as u32 + 1,
       data_max_len: data_field.to_string().len() as u32 + 1,
-      data_offset: previous_entry.map_or(0, |prev| prev.data_offset + prev.data_max_len),
+      data_offset: previous_entry.map_or(0, |(_, prev)| {
+        prev.index_table_entry.data_offset + prev.index_table_entry.data_max_len
+      }),
     };
+
+    self.header.add_entry(key_len_with_padding - prev_padding);
     self.index_table.entries.push(new_table_entry);
     self.entries_mapping.add(key, data_field);
   }

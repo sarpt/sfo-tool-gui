@@ -1,7 +1,5 @@
 use std::{fmt::Display, io::Read};
 
-use crate::sfo::keys::Keys;
-
 #[derive(Clone, Copy, Debug)]
 pub struct Header {
   pub version: u32,
@@ -9,6 +7,8 @@ pub struct Header {
   pub data_table_start: u32,
   pub table_entries: u32,
 }
+
+const KEY_TABLE_ENTRY_SIZE: u8 = 16;
 
 impl Header {
   pub fn new<T>(reader: &mut T) -> Result<Self, String>
@@ -44,9 +44,9 @@ impl Header {
     })
   }
 
-  pub fn add_entry(&mut self, key: &Keys) {
-    self.key_table_start += 16;
-    self.data_table_start += key.len() as u32; // TODO: take into account padding aligned to 4 bytes between key table and start of table_entries
+  pub fn add_entry(&mut self, key_size: u32) {
+    self.key_table_start += KEY_TABLE_ENTRY_SIZE as u32;
+    self.data_table_start += key_size + KEY_TABLE_ENTRY_SIZE as u32;
     self.table_entries += 1;
   }
 }
