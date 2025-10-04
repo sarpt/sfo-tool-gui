@@ -88,6 +88,6 @@ pub enum Keys {
 
 impl Keys {
   pub fn len(&self) -> usize {
-    self.as_ref().len() + 1
+    self.to_string().len() + 1
   }
 }

@@ -54,10 +54,9 @@ impl Sfo {
     }
 
     let header = Header::new(reader).map_err(SfoParseErr::HeaderReadErr)?;
-    let mut index_table =
-      IndexTable::new(reader, &header).map_err(SfoParseErr::IndexTableReadErr)?;
+    let index_table = IndexTable::new(reader, &header).map_err(SfoParseErr::IndexTableReadErr)?;
     let entries_mapping =
-      Mapping::new(reader, &mut index_table).map_err(SfoParseErr::EntriesMappingReadErr)?;
+      Mapping::new(reader, &index_table).map_err(SfoParseErr::EntriesMappingReadErr)?;
 
     Ok(Self {
       header,
@@ -85,7 +84,7 @@ impl Sfo {
       key_offset: previous_entry
         .as_ref()
         .map_or(0, |(_, prev)| {
-          prev.index_table_entry.key_offset as u32 + prev_key_len // TODO: Fix off-by-one with more than one added key
+          prev.index_table_entry.key_offset as u32 + prev_key_len
         })
         .try_into()
         .unwrap_or_default(),
