@@ -106,6 +106,8 @@ impl Mapping {
           copy(&mut val.to_le_bytes().as_slice(), &mut buff.as_mut_slice())?;
         }
       }
+
+      writer.write_all(&buff)?;
     }
 
     Ok(())
