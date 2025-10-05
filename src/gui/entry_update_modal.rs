@@ -44,25 +44,30 @@ impl EntryUpdateModal {
 
       ui.separator();
 
-      let cancel_btn = ui.button("Cancel");
-      if cancel_btn.clicked() {
-        return ModalAction::Cancel;
-      }
+      ui
+        .horizontal(|ui| {
+          let ok_btn = ui
+            .add_enabled(
+              !self.key.is_empty() && !self.data_field_value.is_empty(),
+              egui::Button::new("Ok"),
+            )
+            .on_disabled_hover_text("Cannot add an entry with empty key or field");
+          if ok_btn.clicked() {
+            return ModalAction::Ok;
+          }
 
-      let ok_btn = ui.button("Ok");
-      if ok_btn.clicked() {
-        return ModalAction::Ok;
-      }
+          let cancel_btn = ui.button("Cancel");
+          if cancel_btn.clicked() {
+            return ModalAction::Cancel;
+          }
 
-      ModalAction::Noop
+          ModalAction::Noop
+        })
+        .inner
     });
 
     match modal.inner {
       ModalAction::Ok => {
-        if self.key.is_empty() || self.data_field_value.is_empty() {
-          return Err(String::from("Cannot add an entry with empty key or field"));
-        }
-
         let draft_entry_key =
           Keys::from_str(&self.key.take()).expect("could not serialize string for draft entry key");
         let draft_entry_field = DataField::Utf8String(self.data_field_value.take());
