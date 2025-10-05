@@ -129,7 +129,7 @@ impl IndexTableEntry {
     T: Write,
   {
     writer.write_all(&self.key_offset.to_le_bytes())?;
-    writer.write_all(&(self.data_format as u16).to_le_bytes())?;
+    writer.write_all(&(Into::<[u8; 2]>::into(self.data_format)))?;
     writer.write_all(&self.data_len.to_le_bytes())?;
     writer.write_all(&self.data_max_len.to_le_bytes())?;
     writer.write_all(&self.data_offset.to_le_bytes())?;
