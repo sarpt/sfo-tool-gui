@@ -7,6 +7,12 @@ pub enum Format {
   U32 = 0x04,
 }
 
+impl From<Format> for [u8; 2] {
+  fn from(val: Format) -> Self {
+    [0x04, val as u8]
+  }
+}
+
 impl TryFrom<&[u8; 2]> for Format {
   type Error = String;
 

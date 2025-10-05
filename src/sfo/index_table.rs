@@ -1,4 +1,7 @@
-use std::{fmt::Display, io::Read};
+use std::{
+  fmt::Display,
+  io::{self, Read, Write},
+};
 
 use crate::sfo::{format::Format, header::Header};
 
@@ -32,6 +35,17 @@ impl IndexTable {
     }
 
     Ok(IndexTable { entries })
+  }
+
+  pub fn export<T>(&self, writer: &mut T) -> Result<(), io::Error>
+  where
+    T: Write,
+  {
+    for entry in self.entries.iter() {
+      entry.export(writer)?;
+    }
+
+    Ok(())
   }
 }
 
@@ -108,6 +122,19 @@ impl IndexTableEntry {
       data_max_len,
       data_offset,
     })
+  }
+
+  pub fn export<T>(&self, writer: &mut T) -> Result<(), io::Error>
+  where
+    T: Write,
+  {
+    writer.write_all(&self.key_offset.to_le_bytes())?;
+    writer.write_all(&(Into::<[u8; 2]>::into(self.data_format)))?;
+    writer.write_all(&self.data_len.to_le_bytes())?;
+    writer.write_all(&self.data_max_len.to_le_bytes())?;
+    writer.write_all(&self.data_offset.to_le_bytes())?;
+
+    Ok(())
   }
 }
 

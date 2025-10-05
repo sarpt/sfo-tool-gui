@@ -1,4 +1,7 @@
-use std::{io::Read, iter::Enumerate};
+use std::{
+  io::{self, Read, Write},
+  iter::Enumerate,
+};
 use thiserror::Error;
 
 use crate::sfo::{
@@ -15,6 +18,7 @@ pub mod keys;
 pub mod mapping;
 
 pub struct Sfo {
+  pub magic: [u8; 4],
   pub header: Header,
   pub index_table: IndexTable,
   pub entries_mapping: Mapping,
@@ -59,10 +63,63 @@ impl Sfo {
       Mapping::new(reader, &index_table).map_err(SfoParseErr::EntriesMappingReadErr)?;
 
     Ok(Self {
+      magic,
       header,
       index_table,
       entries_mapping,
     })
+  }
+
+  pub fn export<T>(&self, writer: &mut T) -> Result<(), io::Error>
+  where
+    T: Write,
+  {
+    writer.write_all(&self.magic)?;
+
+    self.header.export(writer)?;
+    self.index_table.export(writer)?;
+    self.entries_mapping.export(writer, &self.index_table)?;
+
+    Ok(())
+  }
+
+  pub fn add(&mut self, key: Keys, data_field: DataField) {
+    let previous_entry = self.iter().last();
+    let (prev_key_len, prev_padding) =
+      previous_entry.as_ref().map_or((0, 0), |(prev_key, entry)| {
+        let absolute_prev_key_start_offset =
+          self.header.key_table_start + entry.index_table_entry.key_offset as u32;
+        let absolute_prev_key_end_offset = absolute_prev_key_start_offset + prev_key.len() as u32;
+        (
+          prev_key.len() as u32,
+          self.header.data_table_start - absolute_prev_key_end_offset,
+        )
+      });
+    let key_len_with_padding = key.len() as u32 + 4 - (key.len() as u32 % 4);
+
+    let new_table_entry = IndexTableEntry {
+      key_len: key_len_with_padding,
+      key_offset: previous_entry
+        .as_ref()
+        .map_or(0, |(_, prev)| {
+          prev.index_table_entry.key_offset as u32 + prev_key_len
+        })
+        .try_into()
+        .unwrap_or_default(),
+      data_format: format::Format::Utf8,
+      data_len: data_field.to_string().len() as u32 + 1,
+      data_max_len: data_field.to_string().len() as u32 + 1,
+      data_offset: previous_entry.map_or(0, |(_, prev)| {
+        prev.index_table_entry.data_offset + prev.index_table_entry.data_max_len
+      }),
+    };
+
+    self.header.add_entry(key_len_with_padding - prev_padding);
+    if let Some(entry) = self.index_table.entries.iter_mut().last() {
+      entry.key_len -= prev_padding;
+    };
+    self.index_table.entries.push(new_table_entry);
+    self.entries_mapping.add(key, data_field);
   }
 
   pub fn iter<'a>(&'a self) -> SfoEntryIter<'a> {

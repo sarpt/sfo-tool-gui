@@ -82,6 +82,12 @@ pub enum Keys {
   Version,
   #[strum(serialize = "XMB_APPS")]
   XmbApps,
-  #[strum(serialize = "{0}")]
+  #[strum(serialize = "{0}", default)]
   Unknown(String),
+}
+
+impl Keys {
+  pub fn len(&self) -> usize {
+    self.to_string().len() + 1
+  }
 }
