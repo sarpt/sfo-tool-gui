@@ -1,7 +1,7 @@
 use std::{
   borrow::Cow,
   fs::OpenOptions,
-  io::BufReader,
+  io::{BufReader, BufWriter},
   path::{Path, PathBuf},
 };
 
@@ -57,10 +57,17 @@ impl GuiApp {
 
   fn show_header(&mut self, ctx: &egui::Context) {
     egui::TopBottomPanel::top("header_panel").show(ctx, |ui| {
-      let upload_button = ui.button("Load .sfo file");
-      if upload_button.clicked() {
-        self.show_load_sfo_picker(ctx);
-      }
+      ui.horizontal(|ui| {
+        let load_sfo_btn = ui.button("Load .sfo file");
+        if load_sfo_btn.clicked() {
+          self.show_load_sfo_picker(ctx);
+        }
+
+        let save_sfo_btn = ui.add_enabled(self.sfo.is_some(), egui::Button::new("Save .sfo file")); // TODO: add 'modified' flag to LoadedSfo
+        if save_sfo_btn.clicked() {
+          self.show_save_sfo_picker();
+        }
+      });
 
       ui.label(format!(
         "Loaded file: {}",
@@ -141,6 +148,28 @@ impl GuiApp {
       });
   }
 
+  fn show_save_sfo_picker(&mut self) {
+    if let Some(sfo) = &self.sfo {
+      let files = FileDialog::new()
+        .add_filter("Sfo", &["sfo", "SFO"])
+        .set_directory("/")
+        .save_file();
+
+      let path = match files {
+        Some(path) => path,
+        None => {
+          println!("no path provided");
+          return;
+        }
+      };
+
+      let result = save_sfo_file(path, &sfo.sfo);
+      if let Err(err_msg) = result {
+        self.err_msg = Some(err_msg);
+      }
+    }
+  }
+
   fn show_load_sfo_picker(&mut self, ctx: &egui::Context) {
     let files = FileDialog::new()
       .add_filter("Sfo", &["sfo", "SFO"])
@@ -215,6 +244,24 @@ impl eframe::App for GuiApp {
       }
     }
   }
+}
+
+fn save_sfo_file<T>(path: T, sfo: &Sfo) -> Result<(), String>
+where
+  T: AsRef<Path>,
+{
+  let file = OpenOptions::new()
+    .read(false)
+    .write(true)
+    .create(true)
+    .truncate(true)
+    .open(path.as_ref())
+    .map_err(|err| format!("could not load file: {err}"))?;
+
+  let mut writer = BufWriter::new(file);
+  sfo
+    .export(&mut writer)
+    .map_err(|err| format!("could not save file: {}", err))
 }
 
 fn load_sfo_file<T>(path: T) -> Result<Sfo, String>

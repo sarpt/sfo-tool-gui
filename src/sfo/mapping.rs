@@ -90,7 +90,7 @@ impl Mapping {
       let mut buff = vec![0; entry.key_len as usize];
       copy(&mut key.to_string().as_bytes(), &mut buff.as_mut_slice())?;
 
-      writer.write(&mut buff)?;
+      writer.write_all(&buff)?;
     }
 
     for (idx, key) in self.keys_order.iter().enumerate() {

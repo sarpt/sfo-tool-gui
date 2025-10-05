@@ -74,7 +74,7 @@ impl Sfo {
   where
     T: Write,
   {
-    writer.write(&self.magic)?;
+    writer.write_all(&self.magic)?;
 
     self.header.export(writer)?;
     self.index_table.export(writer)?;
