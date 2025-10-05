@@ -44,26 +44,25 @@ impl EntryUpdateModal {
 
       ui.separator();
 
-      ui
-        .horizontal(|ui| {
-          let ok_btn = ui
-            .add_enabled(
-              !self.key.is_empty() && !self.data_field_value.is_empty(),
-              egui::Button::new("Ok"),
-            )
-            .on_disabled_hover_text("Cannot add an entry with empty key or field");
-          if ok_btn.clicked() {
-            return ModalAction::Ok;
-          }
+      ui.horizontal(|ui| {
+        let ok_btn = ui
+          .add_enabled(
+            !self.key.is_empty() && !self.data_field_value.is_empty(),
+            egui::Button::new("Ok"),
+          )
+          .on_disabled_hover_text("Cannot add an entry with empty key or field");
+        if ok_btn.clicked() {
+          return ModalAction::Ok;
+        }
 
-          let cancel_btn = ui.button("Cancel");
-          if cancel_btn.clicked() {
-            return ModalAction::Cancel;
-          }
+        let cancel_btn = ui.button("Cancel");
+        if cancel_btn.clicked() {
+          return ModalAction::Cancel;
+        }
 
-          ModalAction::Noop
-        })
-        .inner
+        ModalAction::Noop
+      })
+      .inner
     });
 
     match modal.inner {

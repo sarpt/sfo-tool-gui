@@ -1,4 +1,7 @@
-use std::{io::Read, iter::Enumerate};
+use std::{
+  io::{self, Read, Write},
+  iter::Enumerate,
+};
 use thiserror::Error;
 
 use crate::sfo::{
@@ -15,6 +18,7 @@ pub mod keys;
 pub mod mapping;
 
 pub struct Sfo {
+  pub magic: [u8; 4],
   pub header: Header,
   pub index_table: IndexTable,
   pub entries_mapping: Mapping,
@@ -59,10 +63,24 @@ impl Sfo {
       Mapping::new(reader, &index_table).map_err(SfoParseErr::EntriesMappingReadErr)?;
 
     Ok(Self {
+      magic,
       header,
       index_table,
       entries_mapping,
     })
+  }
+
+  pub fn export<T>(&self, writer: &mut T) -> Result<(), io::Error>
+  where
+    T: Write,
+  {
+    writer.write(&self.magic)?;
+
+    self.header.export(writer)?;
+    self.index_table.export(writer)?;
+    self.entries_mapping.export(writer, &self.index_table)?;
+
+    Ok(())
   }
 
   pub fn add(&mut self, key: Keys, data_field: DataField) {

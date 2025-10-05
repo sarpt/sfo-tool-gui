@@ -1,4 +1,10 @@
-use std::{collections::HashMap, fmt::Display, io::Read, str::FromStr, vec};
+use std::{
+  collections::HashMap,
+  fmt::Display,
+  io::{self, Read, Write, copy},
+  str::FromStr,
+  vec,
+};
 
 use crate::sfo::{format::Format, index_table::IndexTable, keys::Keys};
 
@@ -73,6 +79,36 @@ impl Mapping {
 
   pub fn iter<'a>(&'a self) -> MappingIter<'a> {
     MappingIter::new(self)
+  }
+
+  pub fn export<T>(&self, writer: &mut T, index_table: &IndexTable) -> Result<(), io::Error>
+  where
+    T: Write,
+  {
+    for (idx, key) in self.keys_order.iter().enumerate() {
+      let entry = index_table.entries.get(idx).unwrap();
+      let mut buff = vec![0; entry.key_len as usize];
+      copy(&mut key.to_string().as_bytes(), &mut buff.as_mut_slice())?;
+
+      writer.write(&mut buff)?;
+    }
+
+    for (idx, key) in self.keys_order.iter().enumerate() {
+      let index_table_entry = index_table.entries.get(idx).unwrap();
+      let data_entry = self.entries.get(key).unwrap();
+      let mut buff = vec![0; index_table_entry.data_max_len as usize];
+
+      match data_entry {
+        DataField::Utf8String(val) => {
+          copy(&mut val.as_bytes(), &mut buff.as_mut_slice())?;
+        }
+        DataField::U32(val) => {
+          copy(&mut val.to_le_bytes().as_slice(), &mut buff.as_mut_slice())?;
+        }
+      }
+    }
+
+    Ok(())
   }
 }
 

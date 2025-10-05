@@ -1,4 +1,7 @@
-use std::{fmt::Display, io::Read};
+use std::{
+  fmt::Display,
+  io::{self, Read, Write},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Header {
@@ -48,6 +51,18 @@ impl Header {
     self.key_table_start += KEY_TABLE_ENTRY_SIZE as u32;
     self.data_table_start += key_size + KEY_TABLE_ENTRY_SIZE as u32;
     self.table_entries += 1;
+  }
+
+  pub fn export<T>(&self, writer: &mut T) -> Result<(), io::Error>
+  where
+    T: Write,
+  {
+    writer.write_all(&self.version.to_le_bytes())?;
+    writer.write_all(&self.key_table_start.to_le_bytes())?;
+    writer.write_all(&self.data_table_start.to_le_bytes())?;
+    writer.write_all(&self.table_entries.to_le_bytes())?;
+
+    Ok(())
   }
 }
 
