@@ -115,6 +115,9 @@ impl Sfo {
     };
 
     self.header.add_entry(key_len_with_padding - prev_padding);
+    if let Some(entry) = self.index_table.entries.iter_mut().last() {
+      entry.key_len -= prev_padding;
+    };
     self.index_table.entries.push(new_table_entry);
     self.entries_mapping.add(key, data_field);
   }
