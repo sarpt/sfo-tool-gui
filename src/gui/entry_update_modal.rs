@@ -10,8 +10,20 @@ pub struct EntryUpdateModal {
   pub data_field_value: String,
 }
 
+pub enum EntryUpdateModalAction {
+  Close,
+  Noop,
+  Save(DraftEntry),
+}
+
+enum ModalAction {
+  Ok,
+  Cancel,
+  Noop,
+}
+
 impl EntryUpdateModal {
-  pub fn show(&mut self, ctx: &eframe::egui::Context) -> Result<Option<DraftEntry>, String> {
+  pub fn show(&mut self, ctx: &eframe::egui::Context) -> Result<EntryUpdateModalAction, String> {
     let modal = egui::Modal::new(Id::new("draft_entry_modal")).show(ctx, |ui| {
       ui.set_width(250.0);
       egui::Grid::new("draft_entry_grid")
@@ -29,24 +41,48 @@ impl EntryUpdateModal {
           ui.text_edit_singleline(&mut self.data_field_value);
           ui.end_row();
         });
+
+      ui.separator();
+
+      let cancel_btn = ui.button("Cancel");
+      if cancel_btn.clicked() {
+        return ModalAction::Cancel;
+      }
+
+      let ok_btn = ui.button("Ok");
+      if ok_btn.clicked() {
+        return ModalAction::Ok;
+      }
+
+      ModalAction::Noop
     });
 
-    if !modal.should_close() {
-      return Ok(None);
+    match modal.inner {
+      ModalAction::Ok => {
+        if self.key.is_empty() || self.data_field_value.is_empty() {
+          return Err(String::from("Cannot add an entry with empty key or field"));
+        }
+
+        let draft_entry_key =
+          Keys::from_str(&self.key.take()).expect("could not serialize string for draft entry key");
+        let draft_entry_field = DataField::Utf8String(self.data_field_value.take());
+
+        return Ok(EntryUpdateModalAction::Save(DraftEntry {
+          key: draft_entry_key,
+          field: draft_entry_field,
+        }));
+      }
+      ModalAction::Cancel => {
+        return Ok(EntryUpdateModalAction::Close);
+      }
+      ModalAction::Noop => {}
     }
 
-    if self.key.is_empty() || self.data_field_value.is_empty() {
-      return Err(String::from("Cannot add an entry with empty key or field"));
+    if modal.should_close() {
+      return Ok(EntryUpdateModalAction::Close);
     }
 
-    let draft_entry_key =
-      Keys::from_str(&self.key.take()).expect("could not serialize string for draft entry key");
-    let draft_entry_field = DataField::Utf8String(self.data_field_value.take());
-
-    Ok(Some(DraftEntry {
-      key: draft_entry_key,
-      field: draft_entry_field,
-    }))
+    Ok(EntryUpdateModalAction::Noop)
   }
 }
 

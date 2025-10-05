@@ -184,13 +184,14 @@ impl eframe::App for GuiApp {
     if let Some(mut entry_update_modal) = self.entry_update_modal.take() {
       match entry_update_modal.show(ctx) {
         Ok(draft_entry) => match draft_entry {
-          Some(entry) => {
+          entry_update_modal::EntryUpdateModalAction::Close => {}
+          entry_update_modal::EntryUpdateModalAction::Noop => {
+            self.entry_update_modal = Some(entry_update_modal);
+          }
+          entry_update_modal::EntryUpdateModalAction::Save(entry) => {
             if let Some(sfo) = &mut self.sfo {
               sfo.sfo.add(entry.key, entry.field);
             }
-          }
-          None => {
-            self.entry_update_modal = Some(entry_update_modal);
           }
         },
         Err(err_msg) => {
