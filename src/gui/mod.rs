@@ -1,19 +1,26 @@
 use std::{
   borrow::Cow,
-  fs::OpenOptions,
-  io::{BufReader, BufWriter},
   path::{Path, PathBuf},
 };
 
-use crate::{gui::entry_update_modal::EntryUpdateModal, sfo::Sfo};
+use crate::{
+  gui::{
+    entry_update_modal::EntryUpdateModal,
+    file_dialogs::{load_sfo_dialog, save_sfo_dialog},
+    file_ops::load_sfo_file,
+  },
+  sfo::Sfo,
+};
 use eframe::egui::{self, Id};
-use rfd::FileDialog;
 
-pub mod entry_update_modal;
+mod entry_update_modal;
+mod file_dialogs;
+mod file_ops;
 
 struct LoadedSfo {
   sfo: Sfo,
   path: PathBuf,
+  modified: bool,
 }
 
 pub struct GuiApp {
@@ -43,6 +50,7 @@ impl GuiApp {
           Some(LoadedSfo {
             sfo,
             path: PathBuf::from(path.as_ref()),
+            modified: false,
           })
         },
       )
@@ -60,12 +68,17 @@ impl GuiApp {
       ui.horizontal(|ui| {
         let load_sfo_btn = ui.button("Load .sfo file");
         if load_sfo_btn.clicked() {
-          self.show_load_sfo_picker(ctx);
+          self.show_load_sfo_dialog(ctx);
         }
 
-        let save_sfo_btn = ui.add_enabled(self.sfo.is_some(), egui::Button::new("Save .sfo file")); // TODO: add 'modified' flag to LoadedSfo
+        let save_sfo_btn = ui
+          .add_enabled(
+            self.sfo.as_ref().is_some_and(|sfo| sfo.modified),
+            egui::Button::new("Save .sfo file"),
+          )
+          .on_disabled_hover_text("The loaded file has not been modified");
         if save_sfo_btn.clicked() {
-          self.show_save_sfo_picker();
+          self.show_save_sfo_dialog();
         }
       });
 
@@ -96,7 +109,7 @@ impl GuiApp {
             "{NO_SFO_FILE_MSG}\nClick here to provide a .sfo file"
           ));
           if upload_link.clicked() {
-            self.show_load_sfo_picker(ctx);
+            self.show_load_sfo_dialog(ctx);
           }
         },
       );
@@ -148,50 +161,26 @@ impl GuiApp {
       });
   }
 
-  fn show_save_sfo_picker(&mut self) {
+  fn show_save_sfo_dialog(&mut self) {
     if let Some(sfo) = &self.sfo {
-      let files = FileDialog::new()
-        .add_filter("Sfo", &["sfo", "SFO"])
-        .set_directory("/")
-        .save_file();
-
-      let path = match files {
-        Some(path) => path,
-        None => {
-          println!("no path provided");
-          return;
-        }
-      };
-
-      let result = save_sfo_file(path, &sfo.sfo);
+      let result = save_sfo_dialog(&sfo.sfo);
       if let Err(err_msg) = result {
         self.err_msg = Some(err_msg);
       }
     }
   }
 
-  fn show_load_sfo_picker(&mut self, ctx: &egui::Context) {
-    let files = FileDialog::new()
-      .add_filter("Sfo", &["sfo", "SFO"])
-      .set_directory("/")
-      .pick_file();
-
-    let data_path = match files {
-      Some(path) => path,
-      None => {
-        println!("no path provided");
-        return;
-      }
-    };
-    let new_sfo = load_sfo_file(&data_path).map_or_else(
+  fn show_load_sfo_dialog(&mut self, ctx: &egui::Context) {
+    let new_sfo = load_sfo_dialog().map_or_else(
       |err| {
         self.err_msg = Some(format!("could not load a sfo file: {err}"));
         None
       },
-      |sfo| {
+      |(sfo, path)| {
         Some(LoadedSfo {
           sfo,
-          path: PathBuf::from(&data_path),
+          path,
+          modified: false,
         })
       },
     );
@@ -218,8 +207,9 @@ impl eframe::App for GuiApp {
             self.entry_update_modal = Some(entry_update_modal);
           }
           entry_update_modal::EntryUpdateModalAction::Save(entry) => {
-            if let Some(sfo) = &mut self.sfo {
-              sfo.sfo.add(entry.key, entry.field);
+            if let Some(loaded_sfo) = &mut self.sfo {
+              loaded_sfo.sfo.add(entry.key, entry.field);
+              loaded_sfo.modified = true;
             }
           }
         },
@@ -244,36 +234,4 @@ impl eframe::App for GuiApp {
       }
     }
   }
-}
-
-fn save_sfo_file<T>(path: T, sfo: &Sfo) -> Result<(), String>
-where
-  T: AsRef<Path>,
-{
-  let file = OpenOptions::new()
-    .read(false)
-    .write(true)
-    .create(true)
-    .truncate(true)
-    .open(path.as_ref())
-    .map_err(|err| format!("could not load file: {err}"))?;
-
-  let mut writer = BufWriter::new(file);
-  sfo
-    .export(&mut writer)
-    .map_err(|err| format!("could not save file: {}", err))
-}
-
-fn load_sfo_file<T>(path: T) -> Result<Sfo, String>
-where
-  T: AsRef<Path>,
-{
-  let file = OpenOptions::new()
-    .read(true)
-    .write(false)
-    .open(path.as_ref())
-    .map_err(|err| format!("could not load file: {err}"))?;
-
-  let mut reader = BufReader::new(file);
-  Sfo::new(&mut reader).map_err(|err| format!("could not load file: {err}"))
 }
