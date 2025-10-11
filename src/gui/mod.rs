@@ -20,6 +20,7 @@ mod file_ops;
 struct LoadedSfo {
   sfo: Sfo,
   path: PathBuf,
+  modified: bool,
 }
 
 pub struct GuiApp {
@@ -49,6 +50,7 @@ impl GuiApp {
           Some(LoadedSfo {
             sfo,
             path: PathBuf::from(path.as_ref()),
+            modified: false,
           })
         },
       )
@@ -69,7 +71,12 @@ impl GuiApp {
           self.show_load_sfo_dialog(ctx);
         }
 
-        let save_sfo_btn = ui.add_enabled(self.sfo.is_some(), egui::Button::new("Save .sfo file")); // TODO: add 'modified' flag to LoadedSfo
+        let save_sfo_btn = ui
+          .add_enabled(
+            self.sfo.as_ref().is_some_and(|sfo| sfo.modified),
+            egui::Button::new("Save .sfo file"),
+          )
+          .on_disabled_hover_text("The loaded file has not been modified");
         if save_sfo_btn.clicked() {
           self.show_save_sfo_dialog();
         }
@@ -169,7 +176,13 @@ impl GuiApp {
         self.err_msg = Some(format!("could not load a sfo file: {err}"));
         None
       },
-      |(sfo, path)| Some(LoadedSfo { sfo, path }),
+      |(sfo, path)| {
+        Some(LoadedSfo {
+          sfo,
+          path,
+          modified: false,
+        })
+      },
     );
 
     if new_sfo.is_some() {
@@ -194,8 +207,9 @@ impl eframe::App for GuiApp {
             self.entry_update_modal = Some(entry_update_modal);
           }
           entry_update_modal::EntryUpdateModalAction::Save(entry) => {
-            if let Some(sfo) = &mut self.sfo {
-              sfo.sfo.add(entry.key, entry.field);
+            if let Some(loaded_sfo) = &mut self.sfo {
+              loaded_sfo.sfo.add(entry.key, entry.field);
+              loaded_sfo.modified = true;
             }
           }
         },
