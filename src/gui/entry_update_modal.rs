@@ -36,12 +36,15 @@ impl EntryUpdateModal {
   pub fn show(&mut self, ctx: &eframe::egui::Context) -> Result<EntryUpdateModalAction, String> {
     let modal = egui::Modal::new(Id::new("draft_entry_modal")).show(ctx, |ui| {
       ui.set_width(250.0);
-      ui.radio_value(&mut self.data_field_variant, DataFieldVariant::Text, "Text");
-      ui.radio_value(
-        &mut self.data_field_variant,
-        DataFieldVariant::Number,
-        "Number",
-      );
+      ui.heading("Add entry");
+      ui.horizontal(|ui| {
+        ui.radio_value(&mut self.data_field_variant, DataFieldVariant::Text, "Text");
+        ui.radio_value(
+          &mut self.data_field_variant,
+          DataFieldVariant::Number,
+          "Number",
+        );
+      });
       egui::Grid::new("draft_entry_grid")
         .num_columns(2)
         .min_col_width(10.0)

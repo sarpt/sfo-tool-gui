@@ -97,22 +97,18 @@ impl Sfo {
       });
     let key_len_with_padding = key.len() as u32 + 4 - (key.len() as u32 % 4);
 
-    let new_table_entry = IndexTableEntry {
-      key_len: key_len_with_padding,
-      key_offset: previous_entry
-        .as_ref()
-        .map_or(0, |(_, prev)| {
-          prev.index_table_entry.key_offset as u32 + prev_key_len
-        })
-        .try_into()
-        .unwrap_or_default(),
-      data_format: format::Format::Utf8,
-      data_len: data_field.to_string().len() as u32 + 1,
-      data_max_len: data_field.to_string().len() as u32 + 1,
-      data_offset: previous_entry.map_or(0, |(_, prev)| {
-        prev.index_table_entry.data_offset + prev.index_table_entry.data_max_len
-      }),
-    };
+    let key_offset = previous_entry
+      .as_ref()
+      .map_or(0, |(_, prev)| {
+        prev.index_table_entry.key_offset as u32 + prev_key_len
+      })
+      .try_into()
+      .unwrap_or_default();
+    let data_offset = previous_entry.map_or(0, |(_, prev)| {
+      prev.index_table_entry.data_offset + prev.index_table_entry.data_max_len
+    });
+    let new_table_entry =
+      IndexTableEntry::for_data_field(&data_field, key_len_with_padding, key_offset, data_offset);
 
     self.header.add_entry(key_len_with_padding - prev_padding);
     if let Some(entry) = self.index_table.entries.iter_mut().last() {
