@@ -3,7 +3,11 @@ use std::{
   io::{self, Read, Write},
 };
 
-use crate::sfo::{format::Format, header::Header};
+use crate::sfo::{
+  format::{self, Format},
+  header::Header,
+  mapping::DataField,
+};
 
 pub struct IndexTable {
   pub entries: Vec<IndexTableEntry>,
@@ -122,6 +126,31 @@ impl IndexTableEntry {
       data_max_len,
       data_offset,
     })
+  }
+
+  pub fn for_data_field(
+    data_field: &DataField,
+    key_len: u32,
+    key_offset: u16,
+    data_offset: u32,
+  ) -> Self {
+    let (data_format, data_len, data_max_len) = match data_field {
+      DataField::Utf8String(val) => (
+        format::Format::Utf8,
+        val.to_string().len() as u32 + 1,
+        val.to_string().len() as u32 + 1,
+      ),
+      DataField::U32(_) => (Format::U32, 4, 4),
+    };
+
+    IndexTableEntry {
+      key_offset,
+      key_len,
+      data_format,
+      data_len,
+      data_max_len,
+      data_offset,
+    }
   }
 
   pub fn export<T>(&self, writer: &mut T) -> Result<(), io::Error>
