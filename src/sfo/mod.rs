@@ -1,5 +1,5 @@
 use std::{
-  io::{self, Read, Write},
+  io::{self, Read, Seek, Write},
   iter::Enumerate,
 };
 use thiserror::Error;
@@ -43,7 +43,7 @@ pub enum SfoParseErr {
 impl Sfo {
   pub fn new<T>(reader: &mut T) -> Result<Self, SfoParseErr>
   where
-    T: Read,
+    T: Read + Seek,
   {
     let mut magic: [u8; 4] = [0; 4];
     reader
@@ -60,7 +60,7 @@ impl Sfo {
     let header = Header::new(reader).map_err(SfoParseErr::HeaderReadErr)?;
     let index_table = IndexTable::new(reader, &header).map_err(SfoParseErr::IndexTableReadErr)?;
     let entries_mapping =
-      Mapping::new(reader, &index_table).map_err(SfoParseErr::EntriesMappingReadErr)?;
+      Mapping::new(reader, &index_table, &header).map_err(SfoParseErr::EntriesMappingReadErr)?;
 
     Ok(Self {
       magic,
@@ -85,17 +85,9 @@ impl Sfo {
 
   pub fn add(&mut self, key: Keys, data_field: DataField) {
     let previous_entry = self.iter().last();
-    let (prev_key_len, prev_padding) =
-      previous_entry.as_ref().map_or((0, 0), |(prev_key, entry)| {
-        let absolute_prev_key_start_offset =
-          self.header.key_table_start + entry.index_table_entry.key_offset as u32;
-        let absolute_prev_key_end_offset = absolute_prev_key_start_offset + prev_key.len() as u32;
-        (
-          prev_key.len() as u32,
-          self.header.data_table_start - absolute_prev_key_end_offset,
-        )
-      });
-    let key_len_with_padding = key.len() as u32 + 4 - (key.len() as u32 % 4);
+    let prev_key_len = previous_entry
+      .as_ref()
+      .map_or(0, |(prev_key, _)| prev_key.len() as u32);
 
     let key_offset = previous_entry
       .as_ref()
@@ -107,15 +99,14 @@ impl Sfo {
     let data_offset = previous_entry.map_or(0, |(_, prev)| {
       prev.index_table_entry.data_offset + prev.index_table_entry.data_max_len
     });
-    let new_table_entry =
-      IndexTableEntry::for_data_field(&data_field, key_len_with_padding, key_offset, data_offset);
 
-    self.header.add_entry(key_len_with_padding - prev_padding);
-    if let Some(entry) = self.index_table.entries.iter_mut().last() {
-      entry.key_len -= prev_padding;
-    };
-    self.index_table.entries.push(new_table_entry);
+    self.header.add_entry(key.len() as u32);
+    self.index_table.add(&data_field, key_offset, data_offset);
     self.entries_mapping.add(key, data_field);
+  }
+
+  pub fn delete(&mut self, key: Keys) {
+    self.header.delete_entry(key.len() as u32);
   }
 
   pub fn iter<'a>(&'a self) -> SfoEntryIter<'a> {

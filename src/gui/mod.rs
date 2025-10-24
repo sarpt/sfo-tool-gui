@@ -158,7 +158,7 @@ impl GuiApp {
         for (key, entry) in sfo.iter() {
           let del_btn = ui.button("Del");
           if del_btn.clicked() {
-            self.delete_entry_dialog = Some(DeleteEntryDialog::new(key.as_ref()));
+            self.delete_entry_dialog = Some(DeleteEntryDialog::new(key.clone()));
           }
 
           ui.label(key.to_string())
@@ -229,8 +229,9 @@ impl eframe::App for GuiApp {
 
     if let Some(dialog) = self.delete_entry_dialog.take() {
       if let Some(confirm) = dialog.show(ctx) {
-        if confirm {
-          // TODO: delete entry
+        if confirm && let Some(loaded_sfo) = &mut self.sfo {
+          loaded_sfo.sfo.delete(dialog.key);
+          loaded_sfo.modified = true;
         }
       } else {
         self.delete_entry_dialog = Some(dialog);

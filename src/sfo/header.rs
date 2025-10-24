@@ -5,7 +5,7 @@ use std::{
 
 #[derive(Clone, Copy, Debug)]
 pub struct Header {
-  pub version: u32,
+  version: u32,
   pub key_table_start: u32,
   pub data_table_start: u32,
   pub table_entries: u32,
@@ -51,6 +51,12 @@ impl Header {
     self.key_table_start += KEY_TABLE_ENTRY_SIZE as u32;
     self.data_table_start += key_size + KEY_TABLE_ENTRY_SIZE as u32;
     self.table_entries += 1;
+  }
+
+  pub fn delete_entry(&mut self, key_size: u32) {
+    self.key_table_start -= KEY_TABLE_ENTRY_SIZE as u32;
+    self.data_table_start -= key_size + KEY_TABLE_ENTRY_SIZE as u32;
+    self.table_entries -= 1;
   }
 
   pub fn export<T>(&self, writer: &mut T) -> Result<(), io::Error>

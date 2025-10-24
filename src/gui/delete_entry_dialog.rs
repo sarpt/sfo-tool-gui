@@ -1,14 +1,14 @@
-use eframe::egui;
+use eframe::egui::{self};
+
+use crate::sfo::keys::Keys;
 
 pub struct DeleteEntryDialog {
-  key: String,
+  pub key: Keys,
 }
 
 impl DeleteEntryDialog {
-  pub fn new(key: &str) -> Self {
-    DeleteEntryDialog {
-      key: String::from(key),
-    }
+  pub fn new(key: Keys) -> Self {
+    DeleteEntryDialog { key }
   }
 
   pub fn show(&self, ctx: &eframe::egui::Context) -> Option<bool> {

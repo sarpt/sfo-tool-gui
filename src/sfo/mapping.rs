@@ -1,16 +1,19 @@
 use std::{
   collections::HashMap,
   fmt::Display,
-  io::{self, Read, Write, copy},
+  io::{self, Read, Seek, Write, copy},
   str::FromStr,
   vec,
 };
 
-use crate::sfo::{format::Format, index_table::IndexTable, keys::Keys};
+use crate::sfo::{format::Format, header::Header, index_table::IndexTable, keys::Keys};
+
+const KEY_TABLE_PADDING_ALIGNMENT_BYTES: u32 = 4;
 
 pub struct Mapping {
   keys_order: Vec<Keys>,
   entries: HashMap<Keys, DataField>,
+  pub padding: usize,
 }
 
 impl Display for Mapping {
@@ -27,23 +30,37 @@ impl Display for Mapping {
 }
 
 impl Mapping {
-  pub fn new<T>(reader: &mut T, index_table: &IndexTable) -> Result<Self, String>
+  pub fn new<T>(reader: &mut T, index_table: &IndexTable, header: &Header) -> Result<Self, String>
   where
-    T: Read,
+    T: Read + Seek,
   {
     let mut keys_order = Vec::<Keys>::with_capacity(index_table.entries.len());
 
-    for index_table_entry in &index_table.entries {
-      let mut buff = vec![0; index_table_entry.key_len as usize];
+    let mut padding: usize = 0;
+    for (idx, index_table_entry) in index_table.entries.iter().enumerate() {
+      let next_entry = index_table.entries.get(idx + 1);
+      let key_len = match next_entry {
+        Some(next_entry) => (next_entry.key_offset - index_table_entry.key_offset) as usize,
+        None => {
+          (header.data_table_start - (header.key_table_start + index_table_entry.key_offset as u32))
+            as usize
+        }
+      };
+      // let mut buff = vec![0; index_table_entry.key_len as usize];
+      let mut buff = vec![0; key_len];
       reader
         .read_exact(&mut buff)
         .map_err(|err| format!("could not read key: {err}"))?;
 
-      keys_order.push(key_from_buff(&buff)?);
+      let key = key_from_buff(&buff)?;
+      if next_entry.is_none() {
+        padding = key_len - key.len();
+      }
+
+      keys_order.push(key);
     }
 
     let mut entries = HashMap::<Keys, DataField>::new();
-
     for (idx, index_table_entry) in index_table.entries.iter().enumerate() {
       let key = keys_order[idx].clone();
       let mut data_buff = vec![0; index_table_entry.data_max_len as usize];
@@ -69,12 +86,16 @@ impl Mapping {
     Ok(Mapping {
       entries,
       keys_order,
+      padding,
     })
   }
 
   pub fn add(&mut self, key: Keys, data_field: DataField) {
     self.keys_order.push(key.clone());
     self.entries.insert(key, data_field);
+    let sum_of_keys: usize = self.keys_order.iter().map(|key| key.len()).sum();
+    self.padding = (KEY_TABLE_PADDING_ALIGNMENT_BYTES
+      - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES)) as usize;
   }
 
   pub fn iter<'a>(&'a self) -> MappingIter<'a> {
@@ -85,13 +106,15 @@ impl Mapping {
   where
     T: Write,
   {
-    for (idx, key) in self.keys_order.iter().enumerate() {
-      let entry = index_table.entries.get(idx).unwrap();
-      let mut buff = vec![0; entry.key_len as usize];
+    for key in &self.keys_order {
+      let mut buff = vec![0; key.len()];
       copy(&mut key.to_string().as_bytes(), &mut buff.as_mut_slice())?;
 
       writer.write_all(&buff)?;
     }
+
+    let padding_buff = vec![0; self.padding];
+    writer.write_all(&padding_buff)?;
 
     for (idx, key) in self.keys_order.iter().enumerate() {
       let index_table_entry = index_table.entries.get(idx).unwrap();
