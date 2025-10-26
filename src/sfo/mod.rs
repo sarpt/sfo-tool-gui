@@ -22,9 +22,11 @@ pub struct Sfo {
   pub header: Header,
   pub index_table: IndexTable,
   pub entries_mapping: Mapping,
+  pub padding: usize,
 }
 
 const UNCONTAINED_PARAM_SFO_MAGIC: [u8; 4] = [0x00, 0x50, 0x53, 0x46];
+const KEY_TABLE_PADDING_ALIGNMENT_BYTES: u32 = 4;
 
 #[derive(Error, Debug)]
 pub enum SfoParseErr {
@@ -61,12 +63,16 @@ impl Sfo {
     let index_table = IndexTable::new(reader, &header).map_err(SfoParseErr::IndexTableReadErr)?;
     let entries_mapping =
       Mapping::new(reader, &index_table, &header).map_err(SfoParseErr::EntriesMappingReadErr)?;
+    let sum_of_keys = entries_mapping.keys_len();
+    let padding = (KEY_TABLE_PADDING_ALIGNMENT_BYTES
+      - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES)) as usize;
 
     Ok(Self {
       magic,
       header,
       index_table,
       entries_mapping,
+      padding,
     })
   }
 
@@ -78,7 +84,9 @@ impl Sfo {
 
     self.header.export(writer)?;
     self.index_table.export(writer)?;
-    self.entries_mapping.export(writer, &self.index_table)?;
+    self
+      .entries_mapping
+      .export(writer, &self.index_table, self.padding)?;
 
     Ok(())
   }
@@ -100,13 +108,28 @@ impl Sfo {
       prev.index_table_entry.data_offset + prev.index_table_entry.data_max_len
     });
 
-    self.header.add_entry(key.len() as u32);
+    let key_len = key.len() as u32;
     self.index_table.add(&data_field, key_offset, data_offset);
     self.entries_mapping.add(key, data_field);
+    self.header.add_entry(key_len, self.padding as u32);
   }
 
-  pub fn delete(&mut self, key: Keys) {
-    self.header.delete_entry(key.len() as u32);
+  pub fn delete(&mut self, key: &Keys) -> Result<(), String> {
+    let idx = self
+      .iter()
+      .enumerate()
+      .find_map(|(idx, (k, _))| if k == key { Some(idx) } else { None })
+      .ok_or_else(|| format!("could not delete key {key}"))?;
+    self.index_table.delete(idx, key.len() as u16);
+    self.entries_mapping.delete(idx, key);
+    let sum_of_keys = self.entries_mapping.keys_len();
+    let new_padding =
+      KEY_TABLE_PADDING_ALIGNMENT_BYTES - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES);
+    self
+      .header
+      .delete_entry(key.len() as u32, new_padding, self.padding as u32);
+    self.padding = new_padding as usize;
+    Ok(())
   }
 
   pub fn iter<'a>(&'a self) -> SfoEntryIter<'a> {

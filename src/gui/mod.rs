@@ -230,8 +230,10 @@ impl eframe::App for GuiApp {
     if let Some(dialog) = self.delete_entry_dialog.take() {
       if let Some(confirm) = dialog.show(ctx) {
         if confirm && let Some(loaded_sfo) = &mut self.sfo {
-          loaded_sfo.sfo.delete(dialog.key);
-          loaded_sfo.modified = true;
+          match loaded_sfo.sfo.delete(&dialog.key) {
+            Ok(_) => loaded_sfo.modified = true,
+            Err(err) => self.err_msg = Some(err),
+          }
         }
       } else {
         self.delete_entry_dialog = Some(dialog);

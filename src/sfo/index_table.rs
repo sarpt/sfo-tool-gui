@@ -44,6 +44,14 @@ impl IndexTable {
     let new_table_entry = IndexTableEntry::for_data_field(data_field, key_offset, data_offset);
     self.entries.push(new_table_entry);
   }
+
+  pub fn delete(&mut self, idx: usize, key_len: u16) {
+    let removed_entry = self.entries.remove(idx);
+    for entry in self.entries[idx..].iter_mut() {
+      entry.key_offset -= key_len;
+      entry.data_offset -= removed_entry.data_len;
+    }
+  }
 }
 
 impl Display for IndexTable {
@@ -62,7 +70,6 @@ impl Display for IndexTable {
 #[derive(Clone, Copy, Debug)]
 pub struct IndexTableEntry {
   pub key_offset: u16,
-  // pub key_len: u32,
   pub data_format: Format,
   pub data_len: u32,
   pub data_max_len: u32,

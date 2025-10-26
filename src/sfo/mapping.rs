@@ -13,7 +13,6 @@ const KEY_TABLE_PADDING_ALIGNMENT_BYTES: u32 = 4;
 pub struct Mapping {
   keys_order: Vec<Keys>,
   entries: HashMap<Keys, DataField>,
-  pub padding: usize,
 }
 
 impl Display for Mapping {
@@ -36,7 +35,6 @@ impl Mapping {
   {
     let mut keys_order = Vec::<Keys>::with_capacity(index_table.entries.len());
 
-    let mut padding: usize = 0;
     for (idx, index_table_entry) in index_table.entries.iter().enumerate() {
       let next_entry = index_table.entries.get(idx + 1);
       let key_len = match next_entry {
@@ -46,16 +44,12 @@ impl Mapping {
             as usize
         }
       };
-      // let mut buff = vec![0; index_table_entry.key_len as usize];
       let mut buff = vec![0; key_len];
       reader
         .read_exact(&mut buff)
         .map_err(|err| format!("could not read key: {err}"))?;
 
       let key = key_from_buff(&buff)?;
-      if next_entry.is_none() {
-        padding = key_len - key.len();
-      }
 
       keys_order.push(key);
     }
@@ -86,23 +80,33 @@ impl Mapping {
     Ok(Mapping {
       entries,
       keys_order,
-      padding,
     })
   }
 
   pub fn add(&mut self, key: Keys, data_field: DataField) {
     self.keys_order.push(key.clone());
     self.entries.insert(key, data_field);
-    let sum_of_keys: usize = self.keys_order.iter().map(|key| key.len()).sum();
-    self.padding = (KEY_TABLE_PADDING_ALIGNMENT_BYTES
-      - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES)) as usize;
+  }
+
+  pub fn delete(&mut self, idx: usize, key: &Keys) {
+    self.keys_order.remove(idx);
+    self.entries.remove(key);
+  }
+
+  pub fn keys_len(&self) -> usize {
+    self.keys_order.iter().map(|key| key.len()).sum()
   }
 
   pub fn iter<'a>(&'a self) -> MappingIter<'a> {
     MappingIter::new(self)
   }
 
-  pub fn export<T>(&self, writer: &mut T, index_table: &IndexTable) -> Result<(), io::Error>
+  pub fn export<T>(
+    &self,
+    writer: &mut T,
+    index_table: &IndexTable,
+    padding: usize,
+  ) -> Result<(), io::Error>
   where
     T: Write,
   {
@@ -113,7 +117,7 @@ impl Mapping {
       writer.write_all(&buff)?;
     }
 
-    let padding_buff = vec![0; self.padding];
+    let padding_buff = vec![0; padding];
     writer.write_all(&padding_buff)?;
 
     for (idx, key) in self.keys_order.iter().enumerate() {
