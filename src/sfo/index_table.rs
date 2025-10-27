@@ -20,20 +20,8 @@ impl IndexTable {
   {
     let mut entries: Vec<IndexTableEntry> = Vec::new();
 
-    for idx in 0..header.table_entries {
-      let mut entry = IndexTableEntry::new(reader)?;
-
-      if idx != 0 {
-        let prev_entry = entries
-          .get_mut((idx - 1) as usize)
-          .ok_or_else(|| format!("could not update length of key {}", idx - 1))?;
-        prev_entry.key_len = entry.key_offset as u32 - prev_entry.key_offset as u32;
-      }
-
-      if idx == header.table_entries - 1 {
-        entry.key_len =
-          header.data_table_start - (entry.key_offset as u32 + header.key_table_start);
-      }
+    for _ in 0..header.table_entries {
+      let entry = IndexTableEntry::new(reader)?;
 
       entries.push(entry);
     }
@@ -50,6 +38,19 @@ impl IndexTable {
     }
 
     Ok(())
+  }
+
+  pub fn add(&mut self, data_field: &DataField, key_offset: u16, data_offset: u32) {
+    let new_table_entry = IndexTableEntry::for_data_field(data_field, key_offset, data_offset);
+    self.entries.push(new_table_entry);
+  }
+
+  pub fn delete(&mut self, idx: usize, key_len: u16) {
+    let removed_entry = self.entries.remove(idx);
+    for entry in self.entries[idx..].iter_mut() {
+      entry.key_offset -= key_len;
+      entry.data_offset -= removed_entry.data_len;
+    }
   }
 }
 
@@ -69,7 +70,6 @@ impl Display for IndexTable {
 #[derive(Clone, Copy, Debug)]
 pub struct IndexTableEntry {
   pub key_offset: u16,
-  pub key_len: u32,
   pub data_format: Format,
   pub data_len: u32,
   pub data_max_len: u32,
@@ -120,7 +120,6 @@ impl IndexTableEntry {
 
     Ok(IndexTableEntry {
       key_offset,
-      key_len: 0,
       data_format,
       data_len,
       data_max_len,
@@ -128,12 +127,7 @@ impl IndexTableEntry {
     })
   }
 
-  pub fn for_data_field(
-    data_field: &DataField,
-    key_len: u32,
-    key_offset: u16,
-    data_offset: u32,
-  ) -> Self {
+  pub fn for_data_field(data_field: &DataField, key_offset: u16, data_offset: u32) -> Self {
     let (data_format, data_len, data_max_len) = match data_field {
       DataField::Utf8String(val) => (
         format::Format::Utf8,
@@ -145,7 +139,6 @@ impl IndexTableEntry {
 
     IndexTableEntry {
       key_offset,
-      key_len,
       data_format,
       data_len,
       data_max_len,

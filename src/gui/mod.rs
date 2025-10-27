@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
   gui::{
+    delete_entry_dialog::DeleteEntryDialog,
     entry_update_modal::EntryUpdateModal,
     file_dialogs::{load_sfo_dialog, save_sfo_dialog},
     file_ops::load_sfo_file,
@@ -13,6 +14,7 @@ use crate::{
 };
 use eframe::egui::{self, Id};
 
+mod delete_entry_dialog;
 mod entry_update_modal;
 mod file_dialogs;
 mod file_ops;
@@ -27,6 +29,7 @@ pub struct GuiApp {
   err_msg: Option<String>,
   sfo: Option<LoadedSfo>,
   entry_update_modal: Option<EntryUpdateModal>,
+  delete_entry_dialog: Option<DeleteEntryDialog>,
 }
 
 const NO_SFO_FILE_MSG: &str = "No .sfo file has been provided";
@@ -60,6 +63,7 @@ impl GuiApp {
       sfo,
       err_msg,
       entry_update_modal: None,
+      delete_entry_dialog: None,
     }
   }
 
@@ -152,7 +156,11 @@ impl GuiApp {
         ui.end_row();
 
         for (key, entry) in sfo.iter() {
-          ui.label("");
+          let del_btn = ui.button("Del");
+          if del_btn.clicked() {
+            self.delete_entry_dialog = Some(DeleteEntryDialog::new(key.clone()));
+          }
+
           ui.label(key.to_string())
             .on_hover_text(entry.index_table_entry.to_string());
           ui.label(entry.data.to_string());
@@ -217,6 +225,19 @@ impl eframe::App for GuiApp {
           self.err_msg = Some(err_msg);
         }
       };
+    }
+
+    if let Some(dialog) = self.delete_entry_dialog.take() {
+      if let Some(confirm) = dialog.show(ctx) {
+        if confirm && let Some(loaded_sfo) = &mut self.sfo {
+          match loaded_sfo.sfo.delete(&dialog.key) {
+            Ok(_) => loaded_sfo.modified = true,
+            Err(err) => self.err_msg = Some(err),
+          }
+        }
+      } else {
+        self.delete_entry_dialog = Some(dialog);
+      }
     }
 
     if self.sfo.is_some() {

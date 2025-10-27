@@ -1,5 +1,5 @@
 use std::{
-  io::{self, Read, Write},
+  io::{self, Read, Seek, Write},
   iter::Enumerate,
 };
 use thiserror::Error;
@@ -22,9 +22,11 @@ pub struct Sfo {
   pub header: Header,
   pub index_table: IndexTable,
   pub entries_mapping: Mapping,
+  pub padding: usize,
 }
 
 const UNCONTAINED_PARAM_SFO_MAGIC: [u8; 4] = [0x00, 0x50, 0x53, 0x46];
+const KEY_TABLE_PADDING_ALIGNMENT_BYTES: u32 = 4;
 
 #[derive(Error, Debug)]
 pub enum SfoParseErr {
@@ -43,7 +45,7 @@ pub enum SfoParseErr {
 impl Sfo {
   pub fn new<T>(reader: &mut T) -> Result<Self, SfoParseErr>
   where
-    T: Read,
+    T: Read + Seek,
   {
     let mut magic: [u8; 4] = [0; 4];
     reader
@@ -60,13 +62,17 @@ impl Sfo {
     let header = Header::new(reader).map_err(SfoParseErr::HeaderReadErr)?;
     let index_table = IndexTable::new(reader, &header).map_err(SfoParseErr::IndexTableReadErr)?;
     let entries_mapping =
-      Mapping::new(reader, &index_table).map_err(SfoParseErr::EntriesMappingReadErr)?;
+      Mapping::new(reader, &index_table, &header).map_err(SfoParseErr::EntriesMappingReadErr)?;
+    let sum_of_keys = entries_mapping.keys_len();
+    let padding = (KEY_TABLE_PADDING_ALIGNMENT_BYTES
+      - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES)) as usize;
 
     Ok(Self {
       magic,
       header,
       index_table,
       entries_mapping,
+      padding,
     })
   }
 
@@ -78,24 +84,18 @@ impl Sfo {
 
     self.header.export(writer)?;
     self.index_table.export(writer)?;
-    self.entries_mapping.export(writer, &self.index_table)?;
+    self
+      .entries_mapping
+      .export(writer, &self.index_table, self.padding)?;
 
     Ok(())
   }
 
   pub fn add(&mut self, key: Keys, data_field: DataField) {
     let previous_entry = self.iter().last();
-    let (prev_key_len, prev_padding) =
-      previous_entry.as_ref().map_or((0, 0), |(prev_key, entry)| {
-        let absolute_prev_key_start_offset =
-          self.header.key_table_start + entry.index_table_entry.key_offset as u32;
-        let absolute_prev_key_end_offset = absolute_prev_key_start_offset + prev_key.len() as u32;
-        (
-          prev_key.len() as u32,
-          self.header.data_table_start - absolute_prev_key_end_offset,
-        )
-      });
-    let key_len_with_padding = key.len() as u32 + 4 - (key.len() as u32 % 4);
+    let prev_key_len = previous_entry
+      .as_ref()
+      .map_or(0, |(prev_key, _)| prev_key.len() as u32);
 
     let key_offset = previous_entry
       .as_ref()
@@ -107,15 +107,32 @@ impl Sfo {
     let data_offset = previous_entry.map_or(0, |(_, prev)| {
       prev.index_table_entry.data_offset + prev.index_table_entry.data_max_len
     });
-    let new_table_entry =
-      IndexTableEntry::for_data_field(&data_field, key_len_with_padding, key_offset, data_offset);
 
-    self.header.add_entry(key_len_with_padding - prev_padding);
-    if let Some(entry) = self.index_table.entries.iter_mut().last() {
-      entry.key_len -= prev_padding;
-    };
-    self.index_table.entries.push(new_table_entry);
+    let key_len = key.len() as u32;
+    self.index_table.add(&data_field, key_offset, data_offset);
     self.entries_mapping.add(key, data_field);
+    self.header.add_entry(key_len, self.padding as u32);
+  }
+
+  pub fn delete(&mut self, key: &Keys) -> Result<(), String> {
+    let idx = self
+      .iter()
+      .enumerate()
+      .find_map(|(idx, (k, _))| match k == key {
+        true => Some(idx),
+        false => None,
+      })
+      .ok_or_else(|| format!("could not delete key {key}"))?;
+    self.index_table.delete(idx, key.len() as u16);
+    self.entries_mapping.delete(idx, key);
+    let sum_of_keys = self.entries_mapping.keys_len();
+    let new_padding =
+      KEY_TABLE_PADDING_ALIGNMENT_BYTES - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES);
+    self
+      .header
+      .delete_entry(key.len() as u32, self.padding as u32, new_padding);
+    self.padding = new_padding as usize;
+    Ok(())
   }
 
   pub fn iter<'a>(&'a self) -> SfoEntryIter<'a> {
