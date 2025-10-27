@@ -8,8 +8,6 @@ use std::{
 
 use crate::sfo::{format::Format, header::Header, index_table::IndexTable, keys::Keys};
 
-const KEY_TABLE_PADDING_ALIGNMENT_BYTES: u32 = 4;
-
 pub struct Mapping {
   keys_order: Vec<Keys>,
   entries: HashMap<Keys, DataField>,

@@ -118,7 +118,10 @@ impl Sfo {
     let idx = self
       .iter()
       .enumerate()
-      .find_map(|(idx, (k, _))| if k == key { Some(idx) } else { None })
+      .find_map(|(idx, (k, _))| match k == key {
+        true => Some(idx),
+        false => None,
+      })
       .ok_or_else(|| format!("could not delete key {key}"))?;
     self.index_table.delete(idx, key.len() as u16);
     self.entries_mapping.delete(idx, key);
@@ -127,7 +130,7 @@ impl Sfo {
       KEY_TABLE_PADDING_ALIGNMENT_BYTES - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES);
     self
       .header
-      .delete_entry(key.len() as u32, new_padding, self.padding as u32);
+      .delete_entry(key.len() as u32, self.padding as u32, new_padding);
     self.padding = new_padding as usize;
     Ok(())
   }
