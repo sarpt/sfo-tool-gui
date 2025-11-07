@@ -3,14 +3,22 @@ use std::str::FromStr;
 use eframe::egui::{self, Id, TextBuffer};
 use egui_typed_input::ValText;
 
-use crate::sfo::{keys::Keys, mapping::DataField};
+use crate::sfo::{SfoEntry, keys::Keys, mapping::DataField};
 
 #[derive(Default)]
 pub struct EntryUpdateModal {
-  pub key: String,
+  key: String,
   data_field_string_value: String,
   data_field_num_value: u32,
   data_field_variant: DataFieldVariant,
+  variant: ModalVariant,
+}
+
+#[derive(Default)]
+enum ModalVariant {
+  #[default]
+  Add,
+  Edit,
 }
 
 pub enum EntryUpdateModalAction {
@@ -33,10 +41,42 @@ pub enum DataFieldVariant {
 }
 
 impl EntryUpdateModal {
+  pub fn new_add_entry_modal() -> Self {
+    EntryUpdateModal::default()
+  }
+
+  pub fn new_update_entry_modal(key: &Keys, entry: &SfoEntry) -> Self {
+    let data_field_variant = match entry.index_table_entry.data_format {
+      crate::sfo::format::Format::Utf8 | crate::sfo::format::Format::Utf8Special => {
+        DataFieldVariant::Text
+      }
+      crate::sfo::format::Format::U32 => DataFieldVariant::Number,
+    };
+    let mut modal = EntryUpdateModal {
+      variant: ModalVariant::Edit,
+      key: key.to_string(),
+      data_field_variant,
+      ..Default::default()
+    };
+    match entry.data {
+      DataField::Utf8String(text) => {
+        modal.data_field_string_value = String::from(text);
+      }
+      DataField::U32(val) => {
+        modal.data_field_num_value = *val;
+      }
+    };
+    modal
+  }
+
   pub fn show(&mut self, ctx: &eframe::egui::Context) -> Result<EntryUpdateModalAction, String> {
     let modal = egui::Modal::new(Id::new("draft_entry_modal")).show(ctx, |ui| {
       ui.set_width(250.0);
-      ui.heading("Add entry");
+      match self.variant {
+        ModalVariant::Add => ui.heading("Add entry"),
+        ModalVariant::Edit => ui.heading("Edit entry"),
+      };
+
       ui.horizontal(|ui| {
         ui.radio_value(&mut self.data_field_variant, DataFieldVariant::Text, "Text");
         ui.radio_value(

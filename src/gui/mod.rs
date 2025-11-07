@@ -143,7 +143,7 @@ impl GuiApp {
       .show(ui, |ui| {
         let add_btn = ui.button("Add");
         if add_btn.clicked() {
-          self.entry_update_modal = Some(EntryUpdateModal::default());
+          self.entry_update_modal = Some(EntryUpdateModal::new_add_entry_modal());
         }
 
         ui.label("KEY");
@@ -156,10 +156,17 @@ impl GuiApp {
         ui.end_row();
 
         for (key, entry) in sfo.iter() {
-          let del_btn = ui.button("Del");
-          if del_btn.clicked() {
-            self.delete_entry_dialog = Some(DeleteEntryDialog::new(key.clone()));
-          }
+          ui.horizontal(|ui| {
+            let del_btn = ui.button("Del");
+            if del_btn.clicked() {
+              self.delete_entry_dialog = Some(DeleteEntryDialog::new(key.clone()));
+            }
+
+            let edit_btn = ui.button("Edit");
+            if edit_btn.clicked() {
+              self.entry_update_modal = Some(EntryUpdateModal::new_update_entry_modal(key, &entry));
+            }
+          });
 
           ui.label(key.to_string())
             .on_hover_text(entry.index_table_entry.to_string());
