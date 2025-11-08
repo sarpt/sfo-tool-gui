@@ -114,25 +114,43 @@ impl Sfo {
     self.header.add_entry(key_len, self.padding as u32);
   }
 
+  pub fn edit(&mut self, key: &Keys, data_field: DataField) -> Result<(), String> {
+    let idx = self.get_idx(key)?;
+    self.index_table.edit(idx, &data_field)?;
+    self.entries_mapping.edit(key, data_field);
+    let new_padding = self.calculate_padding();
+    self.header.edit_entry(self.padding as u32, new_padding);
+    self.padding = new_padding as usize;
+    Ok(())
+  }
+
   pub fn delete(&mut self, key: &Keys) -> Result<(), String> {
-    let idx = self
+    let idx = self.get_idx(key)?;
+    self.index_table.delete(idx, key.len() as u16);
+    self.entries_mapping.delete(idx, key);
+    let new_padding = self.calculate_padding();
+    self
+      .header
+      .delete_entry(key.len() as u32, self.padding as u32, new_padding);
+    self.padding = new_padding as usize;
+    Ok(())
+  }
+
+  fn get_idx(&self, key: &Keys) -> Result<usize, String> {
+    self
+      .entries_mapping
       .iter()
       .enumerate()
       .find_map(|(idx, (k, _))| match k == key {
         true => Some(idx),
         false => None,
       })
-      .ok_or_else(|| format!("could not delete key {key}"))?;
-    self.index_table.delete(idx, key.len() as u16);
-    self.entries_mapping.delete(idx, key);
+      .ok_or_else(|| format!("could not find idx of key {key}"))
+  }
+
+  fn calculate_padding(&self) -> u32 {
     let sum_of_keys = self.entries_mapping.keys_len();
-    let new_padding =
-      KEY_TABLE_PADDING_ALIGNMENT_BYTES - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES);
-    self
-      .header
-      .delete_entry(key.len() as u32, self.padding as u32, new_padding);
-    self.padding = new_padding as usize;
-    Ok(())
+    KEY_TABLE_PADDING_ALIGNMENT_BYTES - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES)
   }
 
   pub fn iter<'a>(&'a self) -> SfoEntryIter<'a> {

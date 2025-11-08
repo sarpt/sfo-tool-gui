@@ -45,6 +45,34 @@ impl IndexTable {
     self.entries.push(new_table_entry);
   }
 
+  pub fn edit(&mut self, idx: usize, data_field: &DataField) -> Result<(), String> {
+    let (prev_len, new_len) = {
+      let entry = self.entries.get_mut(idx).ok_or(format!(
+        "could not edit entry with index {idx} - no entry with such index"
+      ))?;
+      let prev_len = entry.data_len;
+      match data_field {
+        DataField::Utf8String(text) => {
+          entry.data_len = (text.len() + 1) as u32;
+          entry.data_max_len = (text.len() + 1) as u32;
+          entry.data_format = Format::Utf8;
+        }
+        DataField::U32(_) => {
+          entry.data_len = 4;
+          entry.data_max_len = 4;
+          entry.data_format = Format::U32;
+        }
+      };
+      (prev_len, entry.data_len)
+    };
+
+    for entry in self.entries[idx + 1..].iter_mut() {
+      entry.data_offset = entry.data_offset - prev_len + new_len;
+    }
+
+    Ok(())
+  }
+
   pub fn delete(&mut self, idx: usize, key_len: u16) {
     let removed_entry = self.entries.remove(idx);
     for entry in self.entries[idx..].iter_mut() {

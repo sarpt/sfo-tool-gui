@@ -5,18 +5,15 @@ use egui_typed_input::ValText;
 
 use crate::sfo::{SfoEntry, keys::Keys, mapping::DataField};
 
-#[derive(Default)]
 pub struct EntryUpdateModal {
   key: String,
   data_field_string_value: String,
   data_field_num_value: u32,
   data_field_variant: DataFieldVariant,
-  variant: ModalVariant,
+  pub variant: ModalVariant,
 }
 
-#[derive(Default)]
-enum ModalVariant {
-  #[default]
+pub enum ModalVariant {
   Add,
   Edit,
 }
@@ -42,7 +39,13 @@ pub enum DataFieldVariant {
 
 impl EntryUpdateModal {
   pub fn new_add_entry_modal() -> Self {
-    EntryUpdateModal::default()
+    EntryUpdateModal {
+      variant: ModalVariant::Add,
+      data_field_variant: Default::default(),
+      data_field_num_value: Default::default(),
+      data_field_string_value: Default::default(),
+      key: Default::default(),
+    }
   }
 
   pub fn new_update_entry_modal(key: &Keys, entry: &SfoEntry) -> Self {
@@ -56,7 +59,8 @@ impl EntryUpdateModal {
       variant: ModalVariant::Edit,
       key: key.to_string(),
       data_field_variant,
-      ..Default::default()
+      data_field_num_value: Default::default(),
+      data_field_string_value: Default::default(),
     };
     match entry.data {
       DataField::Utf8String(text) => {
@@ -93,7 +97,14 @@ impl EntryUpdateModal {
         .striped(true)
         .show(ui, |ui| {
           ui.label("Key");
-          ui.text_edit_singleline(&mut self.key);
+          match self.variant {
+            ModalVariant::Add => {
+              ui.text_edit_singleline(&mut self.key);
+            },
+            ModalVariant::Edit => {
+              ui.label(&self.key).on_hover_text("Key edit is disabled when editing row. Please either add or remove an entry with a new key");
+            },
+          };
           ui.end_row();
 
           ui.label("Data");

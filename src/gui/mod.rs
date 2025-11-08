@@ -223,7 +223,16 @@ impl eframe::App for GuiApp {
           }
           entry_update_modal::EntryUpdateModalAction::Save(entry) => {
             if let Some(loaded_sfo) = &mut self.sfo {
-              loaded_sfo.sfo.add(entry.key, entry.field);
+              match entry_update_modal.variant {
+                entry_update_modal::ModalVariant::Add => {
+                  loaded_sfo.sfo.add(entry.key, entry.field);
+                }
+                entry_update_modal::ModalVariant::Edit => {
+                  if let Err(err_msg) = loaded_sfo.sfo.edit(&entry.key, entry.field) {
+                    self.err_msg = Some(err_msg);
+                  };
+                }
+              };
               loaded_sfo.modified = true;
             }
           }

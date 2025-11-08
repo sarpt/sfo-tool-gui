@@ -59,6 +59,10 @@ impl Header {
     self.table_entries -= 1;
   }
 
+  pub fn edit_entry(&mut self, prev_padding: u32, padding: u32) {
+    self.data_table_start = self.data_table_start - prev_padding + padding;
+  }
+
   pub fn export<T>(&self, writer: &mut T) -> Result<(), io::Error>
   where
     T: Write,
