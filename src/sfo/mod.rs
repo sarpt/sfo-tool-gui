@@ -111,7 +111,11 @@ impl Sfo {
     let key_len = key.len() as u32;
     self.index_table.add(&data_field, key_offset, data_offset);
     self.entries_mapping.add(key, data_field);
-    self.header.add_entry(key_len, self.padding as u32);
+    let new_padding = self.calculate_padding();
+    self
+      .header
+      .add_entry(key_len, self.padding as u32, new_padding);
+    self.padding = new_padding as usize;
   }
 
   pub fn edit(&mut self, key: &Keys, data_field: DataField) -> Result<(), String> {

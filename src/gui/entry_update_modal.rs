@@ -8,7 +8,7 @@ use crate::sfo::{SfoEntry, keys::Keys, mapping::DataField};
 pub struct EntryUpdateModal {
   key: String,
   data_field_string_value: String,
-  data_field_num_value: u32,
+  data_field_num_value: Option<u32>,
   data_field_variant: DataFieldVariant,
   pub variant: ModalVariant,
 }
@@ -42,7 +42,7 @@ impl EntryUpdateModal {
     EntryUpdateModal {
       variant: ModalVariant::Add,
       data_field_variant: Default::default(),
-      data_field_num_value: Default::default(),
+      data_field_num_value: None,
       data_field_string_value: Default::default(),
       key: Default::default(),
     }
@@ -59,7 +59,7 @@ impl EntryUpdateModal {
       variant: ModalVariant::Edit,
       key: key.to_string(),
       data_field_variant,
-      data_field_num_value: Default::default(),
+      data_field_num_value: None,
       data_field_string_value: Default::default(),
     };
     match entry.data {
@@ -67,7 +67,7 @@ impl EntryUpdateModal {
         modal.data_field_string_value = String::from(text);
       }
       DataField::U32(val) => {
-        modal.data_field_num_value = *val;
+        modal.data_field_num_value = Some(*val);
       }
     };
     modal
@@ -102,7 +102,7 @@ impl EntryUpdateModal {
               ui.text_edit_singleline(&mut self.key);
             },
             ModalVariant::Edit => {
-              ui.label(&self.key).on_hover_text("Key edit is disabled when editing row. Please either add or remove an entry with a new key");
+              ui.label(&self.key).on_hover_text("Key edit is disabled when editing row. Please either add a new entry with a new key or remove an existing entry row");
             },
           };
           ui.end_row();
@@ -114,10 +114,12 @@ impl EntryUpdateModal {
             }
             DataFieldVariant::Number => {
               let mut num_input = ValText::<u32, <u32 as FromStr>::Err>::number_uint();
-              num_input.set_val(self.data_field_num_value);
+              if let Some(val) = self.data_field_num_value {
+                num_input.set_val(val);
+              }
               ui.text_edit_singleline(&mut num_input);
               if let Some(Ok(new_val)) = num_input.get_val() {
-                self.data_field_num_value = *new_val;
+                self.data_field_num_value = Some(*new_val);
               };
             }
           }
@@ -129,7 +131,7 @@ impl EntryUpdateModal {
       ui.horizontal(|ui| {
         let value_filled = match self.data_field_variant {
           DataFieldVariant::Text => !self.data_field_string_value.is_empty(),
-          DataFieldVariant::Number => true,
+          DataFieldVariant::Number => self.data_field_num_value.is_some(),
         };
         let ok_btn = ui
           .add_enabled(
@@ -157,7 +159,7 @@ impl EntryUpdateModal {
           Keys::from_str(&self.key.take()).expect("could not serialize string for draft entry key");
         let draft_entry_field = match self.data_field_variant {
           DataFieldVariant::Text => DataField::Utf8String(self.data_field_string_value.take()),
-          DataFieldVariant::Number => DataField::U32(self.data_field_num_value),
+          DataFieldVariant::Number => DataField::U32(self.data_field_num_value.unwrap_or_default()),
         };
 
         return Ok(EntryUpdateModalAction::Save(DraftEntry {
