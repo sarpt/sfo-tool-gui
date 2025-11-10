@@ -86,6 +86,13 @@ impl Mapping {
     self.entries.insert(key, data_field);
   }
 
+  pub fn edit(&mut self, key: &Keys, data_field: DataField) {
+    self
+      .entries
+      .entry(key.clone())
+      .and_modify(|e| *e = data_field);
+  }
+
   pub fn delete(&mut self, idx: usize, key: &Keys) {
     self.keys_order.remove(idx);
     self.entries.remove(key);
