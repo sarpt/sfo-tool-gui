@@ -81,6 +81,25 @@ impl Mapping {
     })
   }
 
+  pub fn get_sorted_idx(&self, key: &Keys) -> usize {
+    match self
+      .keys_order
+      .iter()
+      .enumerate()
+      .find(|(_, it_key)| key >= *it_key)
+    {
+      Some((idx, _)) => idx,
+      None => self.keys_len(),
+    }
+  }
+
+  pub fn field_by_idx(&self, idx: usize) -> Option<&DataField> {
+    match self.keys_order.get(idx) {
+      Some(key) => return self.entries.get(key),
+      None => return None,
+    }
+  }
+
   pub fn add(&mut self, key: Keys, data_field: DataField) {
     self.keys_order.push(key.clone());
     self.entries.insert(key, data_field);

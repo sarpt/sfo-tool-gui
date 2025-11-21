@@ -1,4 +1,6 @@
-#[derive(strum::EnumString, PartialEq, Eq, strum::Display, strum::AsRefStr, Clone, Hash)]
+#[derive(
+  strum::EnumString, PartialEq, Eq, strum::Display, strum::AsRefStr, Clone, Hash, PartialOrd, Ord,
+)]
 pub enum Keys {
   #[strum(serialize = "ACCOUNT_ID")]
   AccountId,
