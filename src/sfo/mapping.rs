@@ -86,10 +86,10 @@ impl Mapping {
       .keys_order
       .iter()
       .enumerate()
-      .find(|(_, it_key)| key >= *it_key)
+      .find(|(_, it_key)| *it_key >= key)
     {
       Some((idx, _)) => idx,
-      None => self.keys_len(),
+      None => self.len(),
     }
   }
 
@@ -100,8 +100,8 @@ impl Mapping {
     }
   }
 
-  pub fn add(&mut self, key: Keys, data_field: DataField) {
-    self.keys_order.push(key.clone());
+  pub fn add(&mut self, idx: usize, key: Keys, data_field: DataField) {
+    self.keys_order.insert(idx, key.clone());
     self.entries.insert(key, data_field);
   }
 
@@ -115,6 +115,10 @@ impl Mapping {
   pub fn delete(&mut self, idx: usize, key: &Keys) {
     self.keys_order.remove(idx);
     self.entries.remove(key);
+  }
+
+  pub fn len(&self) -> usize {
+    self.keys_order.len()
   }
 
   pub fn keys_len(&self) -> usize {

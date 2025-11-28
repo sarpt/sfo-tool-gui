@@ -98,7 +98,7 @@ impl Sfo {
     self
       .index_table
       .add(sorted_idx, key_len as u16, &data_field);
-    self.entries_mapping.add(key, data_field);
+    self.entries_mapping.add(sorted_idx, key, data_field);
     let new_padding = self.calculate_padding();
     self
       .header

@@ -1,6 +1,4 @@
-#[derive(
-  strum::EnumString, PartialEq, Eq, strum::Display, strum::AsRefStr, Clone, Hash, PartialOrd, Ord,
-)]
+#[derive(strum::EnumString, PartialEq, Eq, strum::Display, strum::AsRefStr, Clone, Hash)]
 pub enum Keys {
   #[strum(serialize = "ACCOUNT_ID")]
   AccountId,
@@ -91,5 +89,11 @@ pub enum Keys {
 impl Keys {
   pub fn len(&self) -> usize {
     self.to_string().len() + 1
+  }
+}
+
+impl PartialOrd for Keys {
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    self.to_string().partial_cmp(&other.to_string())
   }
 }
