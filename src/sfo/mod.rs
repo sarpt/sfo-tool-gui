@@ -92,29 +92,17 @@ impl Sfo {
   }
 
   pub fn add(&mut self, key: Keys, data_field: DataField) {
-    let previous_entry = self.iter().last();
-    let prev_key_len = previous_entry
-      .as_ref()
-      .map_or(0, |(prev_key, _)| prev_key.len() as u32);
+    let sorted_idx = self.entries_mapping.get_sorted_idx(&key);
 
-    let key_offset = previous_entry
-      .as_ref()
-      .map_or(0, |(_, prev)| {
-        prev.index_table_entry.key_offset as u32 + prev_key_len
-      })
-      .try_into()
-      .unwrap_or_default();
-    let data_offset = previous_entry.map_or(0, |(_, prev)| {
-      prev.index_table_entry.data_offset + prev.index_table_entry.data_max_len
-    });
-
-    let key_len = key.len() as u32;
-    self.index_table.add(&data_field, key_offset, data_offset);
+    let key_len = key.len();
+    self
+      .index_table
+      .add(sorted_idx, key_len as u16, &data_field);
     self.entries_mapping.add(key, data_field);
     let new_padding = self.calculate_padding();
     self
       .header
-      .add_entry(key_len, self.padding as u32, new_padding);
+      .add_entry(key_len as u32, self.padding as u32, new_padding);
     self.padding = new_padding as usize;
   }
 

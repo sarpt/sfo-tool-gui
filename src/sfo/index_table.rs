@@ -40,9 +40,19 @@ impl IndexTable {
     Ok(())
   }
 
-  pub fn add(&mut self, data_field: &DataField, key_offset: u16, data_offset: u32) {
+  pub fn add(&mut self, idx: usize, key_len: u16, data_field: &DataField) {
+    let (key_offset, data_offset) = {
+      let shifted_entry = self.entries.get(idx);
+      shifted_entry.map_or((0, 0), |entry| (entry.key_offset, entry.data_offset))
+    };
+
     let new_table_entry = IndexTableEntry::for_data_field(data_field, key_offset, data_offset);
-    self.entries.push(new_table_entry);
+    self.entries.insert(idx, new_table_entry);
+
+    for entry in self.entries[idx + 1..].iter_mut() {
+      entry.key_offset += key_len;
+      entry.data_offset += data_field.len();
+    }
   }
 
   pub fn edit(&mut self, idx: usize, data_field: &DataField) -> Result<(), String> {

@@ -95,8 +95,8 @@ impl Mapping {
 
   pub fn field_by_idx(&self, idx: usize) -> Option<&DataField> {
     match self.keys_order.get(idx) {
-      Some(key) => return self.entries.get(key),
-      None => return None,
+      Some(key) => self.entries.get(key),
+      None => None,
     }
   }
 
@@ -175,6 +175,15 @@ impl Display for DataField {
     match self {
       DataField::Utf8String(val) => write!(f, "{val}"),
       DataField::U32(val) => write!(f, "{val}"),
+    }
+  }
+}
+
+impl DataField {
+  pub fn len(&self) -> u32 {
+    match self {
+      DataField::Utf8String(val) => val.to_string().len() as u32 + 1,
+      DataField::U32(_) => 4,
     }
   }
 }
