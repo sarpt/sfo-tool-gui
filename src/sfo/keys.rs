@@ -91,3 +91,9 @@ impl Keys {
     self.to_string().len() + 1
   }
 }
+
+impl PartialOrd for Keys {
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    self.to_string().partial_cmp(&other.to_string())
+  }
+}

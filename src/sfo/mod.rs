@@ -22,7 +22,7 @@ pub struct Sfo {
   pub header: Header,
   pub index_table: IndexTable,
   pub entries_mapping: Mapping,
-  pub padding: usize,
+  pub padding: u32,
 }
 
 const UNCONTAINED_PARAM_SFO_MAGIC: [u8; 4] = [0x00, 0x50, 0x53, 0x46];
@@ -63,17 +63,16 @@ impl Sfo {
     let index_table = IndexTable::new(reader, &header).map_err(SfoParseErr::IndexTableReadErr)?;
     let entries_mapping =
       Mapping::new(reader, &index_table, &header).map_err(SfoParseErr::EntriesMappingReadErr)?;
-    let sum_of_keys = entries_mapping.keys_len();
-    let padding = (KEY_TABLE_PADDING_ALIGNMENT_BYTES
-      - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES)) as usize;
-
-    Ok(Self {
+    let mut sfo = Self {
       magic,
       header,
       index_table,
       entries_mapping,
-      padding,
-    })
+      padding: 0,
+    };
+
+    sfo.recalculate_padding();
+    Ok(sfo)
   }
 
   pub fn export<T>(&self, writer: &mut T) -> Result<(), io::Error>
@@ -92,39 +91,28 @@ impl Sfo {
   }
 
   pub fn add(&mut self, key: Keys, data_field: DataField) {
-    let previous_entry = self.iter().last();
-    let prev_key_len = previous_entry
-      .as_ref()
-      .map_or(0, |(prev_key, _)| prev_key.len() as u32);
+    let sorted_idx = self.entries_mapping.get_sorted_idx(&key);
 
-    let key_offset = previous_entry
-      .as_ref()
-      .map_or(0, |(_, prev)| {
-        prev.index_table_entry.key_offset as u32 + prev_key_len
-      })
-      .try_into()
-      .unwrap_or_default();
-    let data_offset = previous_entry.map_or(0, |(_, prev)| {
-      prev.index_table_entry.data_offset + prev.index_table_entry.data_max_len
-    });
-
-    let key_len = key.len() as u32;
-    self.index_table.add(&data_field, key_offset, data_offset);
-    self.entries_mapping.add(key, data_field);
-    let new_padding = self.calculate_padding();
+    let key_len = key.len();
+    let all_keys_len = self.entries_mapping.keys_len() as u16;
+    self
+      .index_table
+      .add(sorted_idx, key_len as u16, &data_field, all_keys_len);
+    self.entries_mapping.add(sorted_idx, key, data_field);
+    let old_padding = self.padding;
+    self.recalculate_padding();
     self
       .header
-      .add_entry(key_len, self.padding as u32, new_padding);
-    self.padding = new_padding as usize;
+      .add_entry(key_len as u32, old_padding, self.padding);
   }
 
   pub fn edit(&mut self, key: &Keys, data_field: DataField) -> Result<(), String> {
     let idx = self.get_idx(key)?;
     self.index_table.edit(idx, &data_field)?;
     self.entries_mapping.edit(key, data_field);
-    let new_padding = self.calculate_padding();
-    self.header.edit_entry(self.padding as u32, new_padding);
-    self.padding = new_padding as usize;
+    let old_padding = self.padding;
+    self.recalculate_padding();
+    self.header.edit_entry(old_padding, self.padding);
     Ok(())
   }
 
@@ -132,11 +120,11 @@ impl Sfo {
     let idx = self.get_idx(key)?;
     self.index_table.delete(idx, key.len() as u16);
     self.entries_mapping.delete(idx, key);
-    let new_padding = self.calculate_padding();
+    let old_padding = self.padding;
+    self.recalculate_padding();
     self
       .header
-      .delete_entry(key.len() as u32, self.padding as u32, new_padding);
-    self.padding = new_padding as usize;
+      .delete_entry(key.len() as u32, old_padding, self.padding);
     Ok(())
   }
 
@@ -152,9 +140,10 @@ impl Sfo {
       .ok_or_else(|| format!("could not find idx of key {key}"))
   }
 
-  fn calculate_padding(&self) -> u32 {
+  fn recalculate_padding(&mut self) {
     let sum_of_keys = self.entries_mapping.keys_len();
-    KEY_TABLE_PADDING_ALIGNMENT_BYTES - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES)
+    self.padding =
+      KEY_TABLE_PADDING_ALIGNMENT_BYTES - (sum_of_keys as u32 % KEY_TABLE_PADDING_ALIGNMENT_BYTES)
   }
 
   pub fn iter<'a>(&'a self) -> SfoEntryIter<'a> {

@@ -81,8 +81,27 @@ impl Mapping {
     })
   }
 
-  pub fn add(&mut self, key: Keys, data_field: DataField) {
-    self.keys_order.push(key.clone());
+  pub fn get_sorted_idx(&self, key: &Keys) -> usize {
+    match self
+      .keys_order
+      .iter()
+      .enumerate()
+      .find(|(_, it_key)| *it_key >= key)
+    {
+      Some((idx, _)) => idx,
+      None => self.len(),
+    }
+  }
+
+  pub fn field_by_idx(&self, idx: usize) -> Option<&DataField> {
+    match self.keys_order.get(idx) {
+      Some(key) => self.entries.get(key),
+      None => None,
+    }
+  }
+
+  pub fn add(&mut self, idx: usize, key: Keys, data_field: DataField) {
+    self.keys_order.insert(idx, key.clone());
     self.entries.insert(key, data_field);
   }
 
@@ -98,6 +117,10 @@ impl Mapping {
     self.entries.remove(key);
   }
 
+  pub fn len(&self) -> usize {
+    self.keys_order.len()
+  }
+
   pub fn keys_len(&self) -> usize {
     self.keys_order.iter().map(|key| key.len()).sum()
   }
@@ -110,7 +133,7 @@ impl Mapping {
     &self,
     writer: &mut T,
     index_table: &IndexTable,
-    padding: usize,
+    padding: u32,
   ) -> Result<(), io::Error>
   where
     T: Write,
@@ -122,7 +145,7 @@ impl Mapping {
       writer.write_all(&buff)?;
     }
 
-    let padding_buff = vec![0; padding];
+    let padding_buff = vec![0; padding as usize];
     writer.write_all(&padding_buff)?;
 
     for (idx, key) in self.keys_order.iter().enumerate() {
@@ -156,6 +179,15 @@ impl Display for DataField {
     match self {
       DataField::Utf8String(val) => write!(f, "{val}"),
       DataField::U32(val) => write!(f, "{val}"),
+    }
+  }
+}
+
+impl DataField {
+  pub fn len(&self) -> u32 {
+    match self {
+      DataField::Utf8String(val) => val.to_string().len() as u32 + 1,
+      DataField::U32(_) => 4,
     }
   }
 }
