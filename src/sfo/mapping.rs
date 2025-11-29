@@ -133,7 +133,7 @@ impl Mapping {
     &self,
     writer: &mut T,
     index_table: &IndexTable,
-    padding: usize,
+    padding: u32,
   ) -> Result<(), io::Error>
   where
     T: Write,
@@ -145,7 +145,7 @@ impl Mapping {
       writer.write_all(&buff)?;
     }
 
-    let padding_buff = vec![0; padding];
+    let padding_buff = vec![0; padding as usize];
     writer.write_all(&padding_buff)?;
 
     for (idx, key) in self.keys_order.iter().enumerate() {
